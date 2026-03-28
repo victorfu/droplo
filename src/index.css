@@ -1,0 +1,157 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-fg);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-fg);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-fg);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-fg);
+  --color-accent: hsl(252 87% 64%);
+  --color-accent-foreground: hsl(0 0% 100%);
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: hsl(252 87% 64%);
+  --color-success: hsl(142 71% 45%);
+  --radius: 0.75rem;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Accent palette */
+  --color-accent-blue: hsl(217 91% 60%);
+  --color-accent-violet: hsl(252 87% 64%);
+
+  /* Z-index ladder */
+  --z-theme-toggle: 40;
+  --z-drag-overlay: 50;
+}
+
+/* Light theme (default) */
+:root,
+.light {
+  --bg: hsl(0 0% 100%);
+  --fg: hsl(240 10% 4%);
+  --card: hsla(0, 0%, 100%, 0.85);
+  --card-fg: hsl(240 10% 4%);
+  --primary: hsl(240 6% 10%);
+  --primary-fg: hsl(0 0% 98%);
+  --secondary: hsl(240 5% 93%);
+  --secondary-fg: hsl(240 6% 25%);
+  --muted: hsl(240 5% 93%);
+  --muted-fg: hsl(240 4% 46%);
+  --border: hsl(240 6% 90%);
+  --gradient-from: hsl(217 91% 60%);
+  --gradient-to: hsl(252 87% 64%);
+  --hero-from: hsl(240 10% 4%);
+  --hero-to: hsl(240 4% 46%);
+  --accent-gradient: linear-gradient(135deg, hsl(217 91% 60%), hsl(252 87% 64%));
+}
+
+.dark {
+  --bg: hsl(0 0% 4%);
+  --fg: hsl(0 0% 96%);
+  --card: hsla(0, 0%, 7%, 0.8);
+  --card-fg: hsl(0 0% 96%);
+  --primary: hsl(0 0% 98%);
+  --primary-fg: hsl(0 0% 4%);
+  --secondary: hsl(0 0% 12%);
+  --secondary-fg: hsl(0 0% 85%);
+  --muted: hsl(0 0% 12%);
+  --muted-fg: hsl(0 0% 55%);
+  --border: hsl(0 0% 16%);
+  --gradient-from: hsl(217 91% 60%);
+  --gradient-to: hsl(252 87% 64%);
+  --hero-from: hsl(0 0% 100%);
+  --hero-to: hsl(0 0% 65%);
+  --accent-gradient: linear-gradient(135deg, hsl(217 91% 60%), hsl(252 87% 64%));
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px hsl(252 87% 64% / 0.3); }
+  50% { box-shadow: 0 0 40px hsl(252 87% 64% / 0.6); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  *:focus-visible {
+    outline: none;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .gradient-border {
+    position: relative;
+  }
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: var(--accent-gradient);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .hero-gradient {
+    background: linear-gradient(to bottom, var(--hero-from), var(--hero-to));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glass {
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  :root:not(.dark) .glass,
+  .light .glass {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .bg-dot-pattern {
+    background-image: radial-gradient(circle, hsl(0 0% 50% / 0.15) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 20px hsl(252 87% 64% / 0.3);
+    transition: box-shadow 0.3s ease;
+  }
+}
+
+/* Safari iOS: fallback when backdrop-filter is unsupported */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    background: hsla(0, 0%, 7%, 0.95);
+  }
+  :root:not(.dark) .glass,
+  .light .glass {
+    background: hsla(0, 0%, 100%, 0.97);
+  }
+}
