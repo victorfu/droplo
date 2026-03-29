@@ -30,6 +30,7 @@ fi
 
 # 設定專案與 hosting target
 firebase use "$FIREBASE_PROJECT"
+firebase target:clear hosting app 2>/dev/null || true
 firebase target:apply hosting app "$HOSTING_SITE"
 
 # 建置前端

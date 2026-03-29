@@ -30,6 +30,7 @@ export interface DropZoneProps {
 export interface ResultCardProps {
   result: UploadResult;
   onReset: () => void;
+  animate?: boolean;
 }
 
 export interface UploadProgressProps {
@@ -37,22 +38,11 @@ export interface UploadProgressProps {
   progress: UploadProgress;
 }
 
-export interface SiteViewerProps {
-  siteId: string;
-}
-
 export type ThemeMode = 'light' | 'dark';
 
 export interface UseThemeReturn {
   mode: ThemeMode;
   toggle: () => void;
-}
-
-export interface SiteMeta {
-  siteId: string;
-  fileCount: number;
-  originalName: string;
-  createdAt: unknown;
 }
 
 export interface FileEntry {

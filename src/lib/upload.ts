@@ -1,9 +1,21 @@
 import JSZip from 'jszip';
 import { ref, uploadBytes } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { storage, db } from './firebase';
-import { generateSiteId, getMimeType } from './utils';
+import { httpsCallable } from 'firebase/functions';
+import { storage, db, waitForAuth, functions } from './firebase';
+import { generateSiteId, getMimeType, isAllowedFile } from './utils';
 import type { FileEntry, ProgressCallback } from '@/types';
+
+const MAX_SITE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_COUNT = 500;
+
+async function ensureQuota(estimatedSize: number): Promise<void> {
+  const prepareUpload = httpsCallable<{ estimatedSize: number }, { ok: boolean; reason?: string }>(functions, 'prepareUpload');
+  const { data } = await prepareUpload({ estimatedSize });
+  if (!data.ok) {
+    throw new Error(data.reason || '儲存空間不足');
+  }
+}
 
 async function readAllEntries(dirReader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
   const entries: FileSystemEntry[] = [];
@@ -45,14 +57,11 @@ export async function readDroppedFolder(dataTransfer: DataTransfer): Promise<Fil
   for (const item of items) {
     const entry = item.webkitGetAsEntry?.();
     if (entry) {
-      const files = await traverseEntry(entry, '');
-      allFiles.push(...files);
+      allFiles.push(...(await traverseEntry(entry)));
     }
   }
 
-  return allFiles.filter(
-    ({ path }) => !path.includes('.DS_Store') && !path.startsWith('__MACOSX')
-  );
+  return filterFiles(allFiles);
 }
 
 function filterFiles(fileList: FileEntry[]): FileEntry[] {
@@ -116,15 +125,13 @@ export async function uploadSite(
   zipFile: File,
   onProgress: ProgressCallback
 ): Promise<{ siteId: string; url: string }> {
+  const user = await waitForAuth();
   onProgress({ stage: 'unzipping', current: 0, total: 0 });
   const zip = await JSZip.loadAsync(zipFile);
 
-  const entries = Object.entries(zip.files).filter(([path, file]) => {
-    if (file.dir) return false;
-    if (path.startsWith('__MACOSX/')) return false;
-    if (path.includes('.DS_Store')) return false;
-    return true;
-  });
+  const entries = Object.entries(zip.files).filter(
+    ([path, file]) => !file.dir && !path.startsWith('__MACOSX/') && !path.includes('.DS_Store')
+  );
 
   if (entries.length === 0) {
     throw new Error('ZIP 檔案裡沒有可上傳的檔案');
@@ -137,18 +144,36 @@ export async function uploadSite(
     }))
   );
 
+  const allowedFiles = files.filter(({ path }) => isAllowedFile(path));
+
+  if (allowedFiles.length === 0) {
+    throw new Error('沒有可上傳的檔案（僅支援網頁靜態資源）');
+  }
+
+  if (allowedFiles.length > MAX_FILE_COUNT) {
+    throw new Error(`檔案數量超過上限（最多 ${MAX_FILE_COUNT} 個）`);
+  }
+  const totalSize = allowedFiles.reduce((sum, { file }) => sum + (file instanceof ArrayBuffer ? file.byteLength : 0), 0);
+  if (totalSize > MAX_SITE_SIZE) {
+    throw new Error(`網站總大小超過上限（最大 50MB）`);
+  }
+
+  await ensureQuota(totalSize);
+
   const siteId = generateSiteId();
-  await uploadFilesToStorage(files, siteId, onProgress);
+  await uploadFilesToStorage(allowedFiles, siteId, onProgress);
 
   onProgress({ stage: 'saving' });
   await addDoc(collection(db, 'sites'), {
     siteId,
-    fileCount: files.length,
+    uid: user.uid,
+    fileCount: allowedFiles.length,
+    totalSize,
     originalName: zipFile.name,
     createdAt: serverTimestamp(),
   });
 
-  const siteUrl = `${window.location.origin}/${siteId}`;
+  const siteUrl = `${window.location.origin}/s/${siteId}/`;
   return { siteId, url: siteUrl };
 }
 
@@ -156,29 +181,48 @@ export async function uploadFolder(
   fileList: FileEntry[],
   onProgress: ProgressCallback
 ): Promise<{ siteId: string; url: string }> {
+  const user = await waitForAuth();
   const files = filterFiles(fileList);
 
-  if (files.length === 0) {
-    throw new Error('資料夾裡沒有可上傳的檔案');
+  const allowedFiles = files.filter(({ path }) => isAllowedFile(path));
+
+  if (allowedFiles.length === 0) {
+    throw new Error('沒有可上傳的檔案（僅支援網頁靜態資源）');
   }
 
-  const prefix = findPrefix(files);
+  if (allowedFiles.length > MAX_FILE_COUNT) {
+    throw new Error(`檔案數量超過上限（最多 ${MAX_FILE_COUNT} 個）`);
+  }
+  const totalSize = allowedFiles.reduce((sum, { file }) => {
+    if (file instanceof File) return sum + file.size;
+    if (file instanceof ArrayBuffer) return sum + file.byteLength;
+    return sum;
+  }, 0);
+  if (totalSize > MAX_SITE_SIZE) {
+    throw new Error(`網站總大小超過上限（最大 50MB）`);
+  }
+
+  await ensureQuota(totalSize);
+
+  const prefix = findPrefix(allowedFiles);
   if (prefix === null) {
     throw new Error('資料夾裡找不到 index.html');
   }
 
   const siteId = generateSiteId();
-  onProgress({ stage: 'uploading', current: 0, total: files.length });
-  await uploadFilesToStorage(files, siteId, onProgress);
+  onProgress({ stage: 'uploading', current: 0, total: allowedFiles.length });
+  await uploadFilesToStorage(allowedFiles, siteId, onProgress);
 
   onProgress({ stage: 'saving' });
   await addDoc(collection(db, 'sites'), {
     siteId,
-    fileCount: files.length,
+    uid: user.uid,
+    fileCount: allowedFiles.length,
+    totalSize,
     originalName: 'folder-upload',
     createdAt: serverTimestamp(),
   });
 
-  const siteUrl = `${window.location.origin}/${siteId}`;
+  const siteUrl = `${window.location.origin}/s/${siteId}/`;
   return { siteId, url: siteUrl };
 }

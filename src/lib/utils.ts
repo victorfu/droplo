@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 export function generateSiteId(): string {
-  return Math.random().toString(36).slice(2, 10);
+  return crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 }
 
 export const MIME_TYPES: Record<string, string> = {
@@ -32,6 +32,20 @@ export const MIME_TYPES: Record<string, string> = {
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
 };
+
+const ALLOWED_EXTENSIONS = new Set([
+  '.html', '.htm', '.css', '.js', '.mjs', '.json',
+  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp', '.avif',
+  '.woff', '.woff2', '.ttf', '.eot', '.otf',
+  '.pdf', '.txt', '.xml',
+  '.mp4', '.webm', '.ogg', '.mp3', '.wav',
+  '.map', '.webmanifest', '.manifest',
+]);
+
+export function isAllowedFile(path: string): boolean {
+  const ext = path.toLowerCase().match(/\.[^.]+$/)?.[0];
+  return ext ? ALLOWED_EXTENSIONS.has(ext) : false;
+}
 
 export function getMimeType(filename: string): string {
   const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0];

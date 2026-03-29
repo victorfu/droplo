@@ -61,14 +61,14 @@ function runConfetti(container: HTMLDivElement) {
   };
 }
 
-export default function ResultCard({ result, onReset }: ResultCardProps) {
+export default function ResultCard({ result, onReset, animate = true }: ResultCardProps) {
   const [copied, setCopied] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!cardRef.current) return;
+    if (!animate || !cardRef.current) return;
     return runConfetti(cardRef.current);
-  }, []);
+  }, [animate]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(result.url);
@@ -79,17 +79,17 @@ export default function ResultCard({ result, onReset }: ResultCardProps) {
   return (
     <motion.div
       ref={cardRef}
-      initial={{ scale: 0.95, opacity: 0 }}
+      initial={animate ? { scale: 0.95, opacity: 0 } : false}
       animate={{ scale: 1, opacity: 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      transition={animate ? { type: 'spring', stiffness: 300, damping: 25 } : { duration: 0 }}
       className="rounded-2xl gradient-border bg-card p-6 sm:p-10 space-y-6 sm:space-y-8"
     >
-      {/* Success icon — spring scale-in */}
+      {/* Success icon */}
       <div className="flex justify-center">
         <motion.div
-          initial={{ scale: 0 }}
+          initial={animate ? { scale: 0 } : false}
           animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 10, delay: 0.1 }}
+          transition={animate ? { type: 'spring', stiffness: 200, damping: 10, delay: 0.1 } : { duration: 0 }}
           className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-success/10 flex items-center justify-center"
         >
           <Check className="w-5 h-5 sm:w-6 sm:h-6 text-success" />
@@ -104,11 +104,11 @@ export default function ResultCard({ result, onReset }: ResultCardProps) {
         </p>
       </div>
 
-      {/* URL box — delayed fade-in */}
+      {/* URL box */}
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={animate ? { opacity: 0 } : false}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
+        transition={animate ? { delay: 0.3 } : { duration: 0 }}
         className="group flex items-center gap-2 bg-background rounded-xl px-3 sm:px-4 py-3 border border-border hover:border-accent/30 transition-colors"
       >
         <span className="flex-1 text-xs sm:text-sm font-mono text-foreground truncate">

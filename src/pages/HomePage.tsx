@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUpload } from '../hooks/useUpload';
 import DropZone from '../components/DropZone';
@@ -13,8 +14,15 @@ import { readDroppedFolder } from '../lib/upload';
 
 export default function HomePage() {
   const { status, progress, result, error, upload, uploadFiles, reset } = useUpload();
+  const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
+
+  useEffect(() => {
+    if (status === 'done' && result) {
+      navigate(`/${result.siteId}`);
+    }
+  }, [status, result, navigate]);
 
   const handleDrop = useCallback(
     async (e: React.DragEvent<HTMLDivElement>) => {
