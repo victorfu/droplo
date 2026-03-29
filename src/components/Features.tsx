@@ -1,27 +1,7 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Zap, Gift, Shield } from 'lucide-react';
-
-const features = [
-  {
-    icon: Zap,
-    title: '閃電部署',
-    description:
-      '拖曳資料夾或 ZIP，幾秒內你的靜態網站就上線。無需等待，無需設定，立即取得專屬網址。',
-  },
-  {
-    icon: Gift,
-    title: '完全免費',
-    description:
-      '所有功能完全免費，不需要信用卡。由 Firebase 提供強大的基礎架構，穩定可靠且無隱藏費用。',
-  },
-  {
-    icon: Shield,
-    title: '無需帳號',
-    description:
-      '不需要註冊或登入，直接上傳即可。我們相信使用工具應該愈簡單愈好，省去繁瑣的流程。',
-  },
-];
+import { useI18n } from '../lib/i18n';
 
 const containerVariants = {
   hidden: {},
@@ -49,6 +29,25 @@ const headingVariants = {
 export default function Features() {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
+  const { t } = useI18n();
+
+  const features = [
+    {
+      icon: Zap,
+      title: t('features.speed'),
+      description: t('features.speedDesc'),
+    },
+    {
+      icon: Gift,
+      title: t('features.free'),
+      description: t('features.freeDesc'),
+    },
+    {
+      icon: Shield,
+      title: t('features.noAccount'),
+      description: t('features.noAccountDesc'),
+    },
+  ];
 
   return (
     <section ref={ref} className="py-24 px-6">
@@ -60,10 +59,10 @@ export default function Features() {
           variants={headingVariants}
         >
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            為什麼選擇 Droplo
+            {t('features.title')}
           </h2>
           <p className="mt-3 text-sm sm:text-base text-muted-foreground max-w-md mx-auto">
-            為開發者與創作者打造，零摩擦的靜態網站部署體驗。
+            {t('features.subtitle')}
           </p>
         </motion.div>
 

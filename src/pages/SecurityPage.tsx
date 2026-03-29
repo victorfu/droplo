@@ -1,3 +1,4 @@
+import { useI18n } from '../lib/i18n';
 import PageLayout from '../components/PageLayout';
 import { Shield, Lock, FileCheck, Server } from 'lucide-react';
 
@@ -16,35 +17,37 @@ function SecurityItem({ icon: Icon, title, description }: { icon: typeof Shield;
 }
 
 export default function SecurityPage() {
+  const { t } = useI18n();
+
   return (
-    <PageLayout title="安全性">
-      <p>Droplo 採用多層安全防護機制，確保平台與使用者資料的安全。</p>
+    <PageLayout title={t('security.title')}>
+      <p>{t('security.intro')}</p>
 
       <div className="space-y-6 mt-6">
         <SecurityItem
           icon={Shield}
-          title="身份驗證"
-          description="所有上傳操作皆需通過 Firebase Authentication，確保每筆資料都可追溯。"
+          title={t('security.auth')}
+          description={t('security.authDesc')}
         />
         <SecurityItem
           icon={Lock}
-          title="存取控制"
-          description="Firebase Security Rules 嚴格限制資料存取：寫入需認證、檔案不可覆蓋、單檔上限 10MB。"
+          title={t('security.access')}
+          description={t('security.accessDesc')}
         />
         <SecurityItem
           icon={FileCheck}
-          title="檔案驗證"
-          description="僅允許上傳靜態網頁資源（31 種副檔名白名單），自動過濾危險檔案類型。"
+          title={t('security.fileValidation')}
+          description={t('security.fileValidationDesc')}
         />
         <SecurityItem
           icon={Server}
-          title="內容安全"
-          description="所有回應皆包含安全標頭（CSP、X-Content-Type-Options、X-Frame-Options），防止 XSS 和點擊劫持。"
+          title={t('security.contentSecurity')}
+          description={t('security.contentSecurityDesc')}
         />
       </div>
 
-      <h2 className="text-lg font-semibold text-foreground mt-8">回報安全問題</h2>
-      <p>如果您發現任何安全漏洞，請透過 GitHub Issues 回報，我們會盡速處理。</p>
+      <h2 className="text-lg font-semibold text-foreground mt-8">{t('security.reportTitle')}</h2>
+      <p>{t('security.reportBody')}</p>
     </PageLayout>
   );
 }

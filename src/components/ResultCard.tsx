@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Copy, ArrowUpRight, Plus } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 import type { ResultCardProps } from '@/types';
 
 const CONFETTI_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a78bfa', '#60a5fa', '#818cf8'];
@@ -62,6 +63,7 @@ function runConfetti(container: HTMLDivElement) {
 }
 
 export default function ResultCard({ result, onReset, animate = true }: ResultCardProps) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -98,9 +100,9 @@ export default function ResultCard({ result, onReset, animate = true }: ResultCa
 
       {/* Message */}
       <div className="text-center">
-        <h2 className="text-base sm:text-lg font-semibold text-foreground">部署完成</h2>
+        <h2 className="text-base sm:text-lg font-semibold text-foreground">{t('result.title')}</h2>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          你的網站已上線，任何人都可以訪問
+          {t('result.description')}
         </p>
       </div>
 
@@ -119,7 +121,7 @@ export default function ResultCard({ result, onReset, animate = true }: ResultCa
           whileTap={{ scale: 0.98 }}
           onClick={handleCopy}
           className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-secondary transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
-          aria-label="複製網址"
+          aria-label={t('result.copyUrl')}
         >
           {copied ? (
             <Check className="w-3.5 h-3.5 text-success" />
@@ -139,7 +141,7 @@ export default function ResultCard({ result, onReset, animate = true }: ResultCa
           rel="noopener noreferrer"
           className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         >
-          開啟網站
+          {t('result.openSite')}
           <ArrowUpRight className="w-3.5 h-3.5" />
         </motion.a>
         <motion.button
@@ -149,7 +151,7 @@ export default function ResultCard({ result, onReset, animate = true }: ResultCa
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition-all duration-200 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         >
           <Plus className="w-3.5 h-3.5" />
-          再上傳
+          {t('result.uploadMore')}
         </motion.button>
       </div>
     </motion.div>

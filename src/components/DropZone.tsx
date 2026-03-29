@@ -1,9 +1,11 @@
 import { useRef } from 'react';
 import { Upload, FolderOpen } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useI18n } from '../lib/i18n';
 import type { DropZoneProps } from '@/types';
 
 export default function DropZone({ onFile, onFolder, isDragging = false }: DropZoneProps) {
+  const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,22 +74,22 @@ export default function DropZone({ onFile, onFolder, isDragging = false }: DropZ
 
           <div>
             <p className="text-sm sm:text-[15px] font-medium text-foreground">
-              {isDragging ? '放開以開始上傳' : '拖曳資料夾或 ZIP 檔案到此處'}
+              {isDragging ? t('dropZone.dragActive') : t('dropZone.title')}
             </p>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1.5">
-              或點擊選擇 ZIP 檔案
+              {t('dropZone.subtitle')}
             </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap justify-center">
             <span className="inline-flex items-center rounded-full glass px-2.5 py-0.5 text-[11px] text-secondary-foreground font-medium">
-              .zip
+              {t('dropZone.zip')}
             </span>
             <span className="inline-flex items-center rounded-full glass px-2.5 py-0.5 text-[11px] text-secondary-foreground font-medium">
-              資料夾
+              {t('dropZone.folder')}
             </span>
             <span className="text-[11px] text-muted-foreground ml-1">
-              需包含 index.html
+              {t('dropZone.requireIndex')}
             </span>
           </div>
         </div>
@@ -102,7 +104,7 @@ export default function DropZone({ onFile, onFolder, isDragging = false }: DropZ
         className="w-full rounded-xl glass hover:border-accent/50 px-4 py-3 text-sm text-secondary-foreground hover:text-foreground transition-all duration-200 flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2"
       >
         <FolderOpen className="w-4 h-4" />
-        選擇資料夾上傳
+        {t('dropZone.folderButton')}
       </button>
     </div>
   );

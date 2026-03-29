@@ -11,10 +11,12 @@ import HowItWorks from '../components/HowItWorks';
 import Footer from '../components/Footer';
 import { FolderOpen } from 'lucide-react';
 import { readDroppedFolder } from '../lib/upload';
+import { useI18n } from '../lib/i18n';
 
 export default function HomePage() {
   const { status, progress, result, error, upload, uploadFiles, reset } = useUpload();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
 
@@ -45,7 +47,7 @@ export default function HomePage() {
       if (file?.type === 'application/zip' || file?.name.endsWith('.zip')) {
         upload(file);
       } else {
-        alert('請拖曳資料夾或 .zip 檔案');
+        alert(t('upload.alertZipOnly'));
       }
     },
     [status, upload, uploadFiles]
@@ -102,9 +104,9 @@ export default function HomePage() {
                 <FolderOpen className="w-10 h-10 text-accent" />
               </div>
               <div>
-                <p className="text-lg font-semibold text-foreground">放開以上傳</p>
+                <p className="text-lg font-semibold text-foreground">{t('dragOverlay.title')}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  支援資料夾或 .zip 檔案
+                  {t('dragOverlay.subtitle')}
                 </p>
               </div>
             </div>
@@ -129,7 +131,7 @@ export default function HomePage() {
                 Droplo
               </h1>
               <p className="text-muted-foreground mt-2 sm:mt-3 text-sm sm:text-base leading-relaxed">
-                拖曳資料夾或 ZIP，幾秒內上線你的靜態網站
+                {t('common.tagline')}
               </p>
             </header>
 
@@ -149,13 +151,13 @@ export default function HomePage() {
                 <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
                   <span className="text-destructive text-lg font-semibold">!</span>
                 </div>
-                <p className="text-[15px] font-medium text-foreground mb-1">上傳失敗</p>
+                <p className="text-[15px] font-medium text-foreground mb-1">{t('upload.failed')}</p>
                 <p className="text-sm text-muted-foreground mb-6">{error}</p>
                 <button
                   onClick={handleReset}
                   className="text-sm text-accent hover:text-accent/80 transition-colors font-medium rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 min-h-[44px] px-2"
                 >
-                  重新上傳
+                  {t('upload.retry')}
                 </button>
               </div>
             )}

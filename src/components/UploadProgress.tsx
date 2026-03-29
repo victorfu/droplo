@@ -1,20 +1,22 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 import type { UploadProgressProps } from '@/types';
 
-const STAGE_LABELS: Record<string, string> = {
-  unzipping: '解壓縮中...',
-  uploading: '上傳檔案中',
-  saving: '儲存中...',
-};
-
-const STAGE_DESC: Record<string, string> = {
-  unzipping: '正在解壓縮你的 ZIP 檔案',
-  uploading: '正在將檔案上傳至雲端',
-  saving: '正在儲存網站資訊',
-};
-
 export default function UploadProgress({ status, progress }: UploadProgressProps) {
+  const { t } = useI18n();
+
+  const STAGE_LABELS: Record<string, string> = {
+    unzipping: t('upload.unzipping'),
+    uploading: t('upload.uploading'),
+    saving: t('upload.saving'),
+  };
+
+  const STAGE_DESC: Record<string, string> = {
+    unzipping: t('upload.unzippingDesc'),
+    uploading: t('upload.uploadingDesc'),
+    saving: t('upload.savingDesc'),
+  };
   const percent =
     progress.total > 0
       ? Math.round((progress.current / progress.total) * 100)
@@ -50,7 +52,7 @@ export default function UploadProgress({ status, progress }: UploadProgressProps
         </AnimatePresence>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           {status === 'uploading'
-            ? `${progress.current} / ${progress.total} 個檔案`
+            ? `${progress.current} / ${progress.total} ${t('upload.files')}`
             : STAGE_DESC[status]}
         </p>
       </div>

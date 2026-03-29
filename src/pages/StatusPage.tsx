@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useI18n } from '../lib/i18n';
 import PageLayout from '../components/PageLayout';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
@@ -16,8 +17,8 @@ function StatusBadge({ status }: { status: ServiceStatus }) {
   return <XCircle className="w-4 h-4 text-destructive" />;
 }
 
-function StatusRow({ name, status }: { name: string; status: ServiceStatus }) {
-  const label = status === 'checking' ? '檢查中' : status === 'operational' ? '正常運作' : '異常';
+function StatusRow({ name, status, labels }: { name: string; status: ServiceStatus; labels: { checking: string; operational: string; down: string } }) {
+  const label = status === 'checking' ? labels.checking : status === 'operational' ? labels.operational : labels.down;
   return (
     <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
       <span className="text-sm text-foreground">{name}</span>
@@ -30,7 +31,14 @@ function StatusRow({ name, status }: { name: string; status: ServiceStatus }) {
 }
 
 export default function StatusPage() {
+  const { t } = useI18n();
   const [firestore, setFirestore] = useState<ServiceStatus>('checking');
+
+  const labels = {
+    checking: t('status.checking'),
+    operational: t('status.operational'),
+    down: t('status.down'),
+  };
 
   useEffect(() => {
     const q = query(collection(db, 'sites'), limit(1));
@@ -40,15 +48,15 @@ export default function StatusPage() {
   }, []);
 
   return (
-    <PageLayout title="系統狀態">
+    <PageLayout title={t('status.title')}>
       <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
-        <StatusRow name="Firebase Hosting" status="operational" />
-        <StatusRow name="Cloud Functions" status="operational" />
-        <StatusRow name="Firestore Database" status={firestore} />
-        <StatusRow name="Cloud Storage" status="operational" />
+        <StatusRow name="Firebase Hosting" status="operational" labels={labels} />
+        <StatusRow name="Cloud Functions" status="operational" labels={labels} />
+        <StatusRow name="Firestore Database" status={firestore} labels={labels} />
+        <StatusRow name="Cloud Storage" status="operational" labels={labels} />
       </div>
       <p className="text-xs text-muted-foreground mt-4">
-        Firestore 狀態為即時檢測，其他服務如果此頁面可正常載入即表示運作正常。
+        {t('status.note')}
       </p>
     </PageLayout>
   );

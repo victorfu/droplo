@@ -1,27 +1,7 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Upload, Rocket, Link } from 'lucide-react';
-
-const steps = [
-  {
-    number: 1,
-    icon: Upload,
-    title: '拖放檔案',
-    description: '將你的靜態網站資料夾或 ZIP 檔案直接拖曳到 Droplo 的上傳區域。',
-  },
-  {
-    number: 2,
-    icon: Rocket,
-    title: '自動部署',
-    description: '我們自動解壓縮並將所有檔案上傳至 Firebase，整個過程只需數秒。',
-  },
-  {
-    number: 3,
-    icon: Link,
-    title: '取得網址',
-    description: '立即獲得專屬的公開網址，複製後即可分享給任何人瀏覽你的網站。',
-  },
-];
+import { useI18n } from '../lib/i18n';
 
 const containerVariants = {
   hidden: {},
@@ -49,6 +29,28 @@ const headingVariants = {
 export default function HowItWorks() {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
+  const { t } = useI18n();
+
+  const steps = [
+    {
+      number: 1,
+      icon: Upload,
+      title: t('howItWorks.step1'),
+      description: t('howItWorks.step1Desc'),
+    },
+    {
+      number: 2,
+      icon: Rocket,
+      title: t('howItWorks.step2'),
+      description: t('howItWorks.step2Desc'),
+    },
+    {
+      number: 3,
+      icon: Link,
+      title: t('howItWorks.step3'),
+      description: t('howItWorks.step3Desc'),
+    },
+  ];
 
   return (
     <section ref={ref} className="py-24 px-6 bg-secondary/20">
@@ -60,10 +62,10 @@ export default function HowItWorks() {
           variants={headingVariants}
         >
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            如何運作
+            {t('howItWorks.title')}
           </h2>
           <p className="mt-3 text-sm sm:text-base text-muted-foreground max-w-md mx-auto">
-            三個步驟，從檔案到上線，一氣呵成。
+            {t('howItWorks.subtitle')}
           </p>
         </motion.div>
 

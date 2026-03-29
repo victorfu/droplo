@@ -8,10 +8,12 @@ import NotFound from '../components/NotFound';
 import ThemeToggle from '../components/ThemeToggle';
 import Footer from '../components/Footer';
 import { Loader2 } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 
 export default function SitePage() {
   const { siteId } = useParams();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [state, setState] = useState<'loading' | 'found' | 'notfound'>('loading');
 
   useEffect(() => {
@@ -55,7 +57,7 @@ export default function SitePage() {
                 Droplo
               </h1>
               <p className="text-muted-foreground mt-2 sm:mt-3 text-sm sm:text-base leading-relaxed">
-                拖曳資料夾或 ZIP，幾秒內上線你的靜態網站
+                {t('common.tagline')}
               </p>
             </header>
             <ResultCard

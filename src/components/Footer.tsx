@@ -1,6 +1,9 @@
 import { Globe } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 
 export default function Footer() {
+  const { t } = useI18n();
+
   return (
     <footer className="border-t border-border py-10 px-6">
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-start gap-8 sm:gap-12">
@@ -13,24 +16,24 @@ export default function Footer() {
             <span className="text-sm font-semibold text-foreground">Droplo</span>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed max-w-[260px]">
-            拖曳即可上線的靜態網站託管平台
+            {t('footer.description')}
           </p>
         </div>
 
         {/* Links */}
         <div className="flex gap-12 sm:gap-16">
           <div>
-            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">平台</h4>
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">{t('footer.platform')}</h4>
             <ul className="space-y-2">
-              <li><a href="/terms" className="text-sm text-foreground hover:text-accent transition-colors">服務條款</a></li>
-              <li><a href="/privacy" className="text-sm text-foreground hover:text-accent transition-colors">隱私政策</a></li>
+              <li><a href="/terms" className="text-sm text-foreground hover:text-accent transition-colors">{t('footer.terms')}</a></li>
+              <li><a href="/privacy" className="text-sm text-foreground hover:text-accent transition-colors">{t('footer.privacy')}</a></li>
             </ul>
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">信任</h4>
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">{t('footer.trust')}</h4>
             <ul className="space-y-2">
-              <li><a href="/security" className="text-sm text-foreground hover:text-accent transition-colors">安全性</a></li>
-              <li><a href="/status" className="text-sm text-foreground hover:text-accent transition-colors">系統狀態</a></li>
+              <li><a href="/security" className="text-sm text-foreground hover:text-accent transition-colors">{t('footer.security')}</a></li>
+              <li><a href="/status" className="text-sm text-foreground hover:text-accent transition-colors">{t('footer.status')}</a></li>
             </ul>
           </div>
         </div>
