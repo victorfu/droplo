@@ -60,13 +60,13 @@ export default function DropZone({ onFile, onFolder, isDragging = false }: DropZ
               'w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all duration-300',
               isDragging
                 ? 'bg-accent/20 scale-110'
-                : 'bg-secondary/50 group-hover:[background:var(--accent-gradient)]'
+                : 'bg-secondary/50 group-hover:bg-accent/15'
             )}
           >
             {isDragging ? (
               <FolderOpen className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
             ) : (
-              <Upload className="w-5 h-5 sm:w-6 sm:h-6 text-secondary-foreground group-hover:text-foreground transition-colors" />
+              <Upload className="w-5 h-5 sm:w-6 sm:h-6 text-secondary-foreground group-hover:text-accent transition-colors" />
             )}
           </div>
 
