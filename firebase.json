@@ -14,6 +14,10 @@
         "function": "serveSite"
       },
       {
+        "source": "/mcp",
+        "function": "mcp"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
