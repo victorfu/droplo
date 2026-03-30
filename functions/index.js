@@ -3,16 +3,40 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { initializeApp } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getMimeType } from './shared.js';
 
 initializeApp();
-
-export { mcp } from './mcp.js';
 
 const STORAGE_QUOTA = 5 * 1024 * 1024 * 1024; // 5GB
 const SITE_TTL_DAYS = 7;
 
 const db = getFirestore();
+
+const MIME_TYPES = {
+  '.html': 'text/html',
+  '.css': 'text/css',
+  '.js': 'application/javascript',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.webp': 'image/webp',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.pdf': 'application/pdf',
+  '.xml': 'application/xml',
+  '.txt': 'text/plain',
+};
+
+function getMimeType(filePath) {
+  const ext = filePath.toLowerCase().match(/\.[^.]+$/)?.[0];
+  return (ext ? MIME_TYPES[ext] : undefined) ?? 'application/octet-stream';
+}
 
 async function deleteSite(siteId, docId) {
   const bucket = getStorage().bucket();
