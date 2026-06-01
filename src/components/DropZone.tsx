@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Upload, FolderOpen } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
+import { createSingleHtmlEntry } from '../lib/singleHtmlUpload';
 import type { DropZoneProps } from '@/types';
 
 export default function DropZone({ onFile, onFolder, isDragging = false }: DropZoneProps) {
@@ -9,9 +10,17 @@ export default function DropZone({ onFile, onFolder, isDragging = false }: DropZ
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  const handleZipInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) onFile(file);
+    if (!file) return;
+
+    const htmlEntry = createSingleHtmlEntry(file);
+    if (htmlEntry) {
+      onFolder([htmlEntry]);
+      return;
+    }
+
+    onFile(file);
   };
 
   const handleFolderInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,9 +53,9 @@ export default function DropZone({ onFile, onFolder, isDragging = false }: DropZ
         <input
           ref={fileInputRef}
           type="file"
-          accept=".zip"
+          accept=".zip,.html,.htm,text/html"
           className="hidden"
-          onChange={handleZipInput}
+          onChange={handleFileInput}
         />
         <input
           ref={folderInputRef}
@@ -84,6 +93,9 @@ export default function DropZone({ onFile, onFolder, isDragging = false }: DropZ
           <div className="flex items-center gap-2 flex-wrap justify-center">
             <span className="inline-flex items-center rounded-full glass px-2.5 py-0.5 text-[11px] text-secondary-foreground font-medium">
               {t('dropZone.zip')}
+            </span>
+            <span className="inline-flex items-center rounded-full glass px-2.5 py-0.5 text-[11px] text-secondary-foreground font-medium">
+              {t('dropZone.html')}
             </span>
             <span className="inline-flex items-center rounded-full glass px-2.5 py-0.5 text-[11px] text-secondary-foreground font-medium">
               {t('dropZone.folder')}

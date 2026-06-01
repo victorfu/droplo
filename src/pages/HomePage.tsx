@@ -11,6 +11,7 @@ import HowItWorks from '../components/HowItWorks';
 import Footer from '../components/Footer';
 import { FolderOpen } from 'lucide-react';
 import { readDroppedFolder } from '../lib/upload';
+import { createSingleHtmlEntry } from '../lib/singleHtmlUpload';
 import { useI18n } from '../lib/i18n';
 
 export default function HomePage() {
@@ -46,6 +47,14 @@ export default function HomePage() {
       const file = e.dataTransfer.files[0];
       if (file?.type === 'application/zip' || file?.name.endsWith('.zip')) {
         upload(file);
+      } else if (file) {
+        const htmlEntry = createSingleHtmlEntry(file);
+        if (htmlEntry) {
+          uploadFiles([htmlEntry]);
+          return;
+        }
+
+        alert(t('upload.alertZipOnly'));
       } else {
         alert(t('upload.alertZipOnly'));
       }
