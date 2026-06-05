@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { scrypt as scryptCallback } from 'node:crypto';
 import test from 'node:test';
+import { promisify } from 'node:util';
 import {
   buildSessionCookie,
   createSessionToken,
@@ -10,6 +12,12 @@ import {
   verifyPassword,
   verifySessionToken,
 } from './siteAuth.js';
+
+const scrypt = promisify(scryptCallback);
+
+function toBase64Url(value) {
+  return Buffer.from(value).toString('base64url');
+}
 
 test('hashPassword stores an encoded scrypt hash and verifyPassword checks it', async () => {
   const hash = await hashPassword('abcd');
@@ -43,6 +51,39 @@ test('verifyPassword fails closed for malformed encoded hashes', async () => {
   }
 });
 
+test('verifyPassword requires canonical scrypt params and decoded field lengths', async () => {
+  const salt = Buffer.alloc(16, 1);
+  const nonCanonicalKey = await scrypt('abcd', salt, 64, {
+    N: 1024,
+    r: 8,
+    p: 1,
+    maxmem: 64 * 1024 * 1024,
+  });
+  const nonCanonicalHash = [
+    'scrypt',
+    '1024',
+    '8',
+    '1',
+    toBase64Url(salt),
+    toBase64Url(nonCanonicalKey),
+  ].join('$');
+  const canonicalHash = await hashPassword('abcd');
+  const [, n, r, p, , hash] = canonicalHash.split('$');
+
+  assert.equal(await verifyPassword('abcd', nonCanonicalHash), false);
+  assert.equal(
+    await verifyPassword('abcd', `scrypt$${n}$${r}$${p}$YQ$${hash}`),
+    false
+  );
+  assert.equal(
+    await verifyPassword(
+      'abcd',
+      `scrypt$${n}$${r}$${p}$${toBase64Url(salt)}$YQ`
+    ),
+    false
+  );
+});
+
 test('session tokens are tied to one site and password hash', async () => {
   const hash = await hashPassword('abcd');
   const otherHash = await hashPassword('wxyz');
@@ -52,6 +93,14 @@ test('session tokens are tied to one site and password hash', async () => {
   assert.equal(verifySessionToken(token, 'other-site', hash), false);
   assert.equal(verifySessionToken(token, 'site123', otherHash), false);
   assert.equal(verifySessionToken('bad-token', 'site123', hash), false);
+});
+
+test('session tokens require canonical password hashes', () => {
+  assert.equal(verifySessionToken('v1.anything', 'site123', 'not-a-hash'), false);
+  assert.throws(
+    () => createSessionToken('site123', 'not-a-hash'),
+    /Invalid password hash/
+  );
 });
 
 test('buildSessionCookie creates a session-only HttpOnly cookie scoped to the site path', async () => {
@@ -88,6 +137,17 @@ test('getSessionToken ignores malformed percent-encoded cookie parts', () => {
   assert.equal(
     getSessionToken({ headers: { cookie: 'droplo_site_auth=%' } }),
     ''
+  );
+});
+
+test('getSessionToken keeps the first duplicate cookie value', () => {
+  assert.equal(
+    getSessionToken({
+      headers: {
+        cookie: 'droplo_site_auth=first; droplo_site_auth=second',
+      },
+    }),
+    'first'
   );
 });
 

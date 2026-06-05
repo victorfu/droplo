@@ -41,13 +41,6 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function parsePositiveInteger(value) {
-  if (!/^\d+$/.test(value)) return null;
-  const number = Number(value);
-  if (!Number.isSafeInteger(number) || number <= 0) return null;
-  return number;
-}
-
 function isBase64Urlish(value) {
   return typeof value === 'string' && BASE64URL_PATTERN.test(value);
 }
@@ -64,6 +57,38 @@ function validateCookiePathSiteId(siteId) {
   if (typeof siteId !== 'string' || !SITE_ID_PATH_PATTERN.test(siteId)) {
     throw new Error('Invalid siteId for site auth cookie path');
   }
+}
+
+function parsePasswordHash(encodedHash) {
+  if (typeof encodedHash !== 'string') return null;
+
+  const parts = encodedHash.split('$');
+  if (parts.length !== 6) return null;
+
+  const [algorithm, n, r, p, saltValue, hashValue] = parts;
+  if (
+    algorithm !== 'scrypt' ||
+    n !== String(SCRYPT_N) ||
+    r !== String(SCRYPT_R) ||
+    p !== String(SCRYPT_P) ||
+    !isBase64Urlish(saltValue) ||
+    !isBase64Urlish(hashValue)
+  ) {
+    return null;
+  }
+
+  const salt = fromBase64Url(saltValue);
+  const hash = fromBase64Url(hashValue);
+  if (
+    salt.length !== 16 ||
+    hash.length !== KEY_LENGTH ||
+    toBase64Url(salt) !== saltValue ||
+    toBase64Url(hash) !== hashValue
+  ) {
+    return null;
+  }
+
+  return { encodedHash, salt, hash };
 }
 
 export async function hashPassword(password) {
@@ -86,53 +111,51 @@ export async function hashPassword(password) {
 }
 
 export async function verifyPassword(password, encodedHash) {
-  const parts = String(encodedHash).split('$');
-  if (parts.length !== 6) return false;
-
-  const [algorithm, nValue, rValue, pValue, salt, hash] = parts;
-  const n = parsePositiveInteger(nValue);
-  const r = parsePositiveInteger(rValue);
-  const p = parsePositiveInteger(pValue);
-
-  if (
-    algorithm !== 'scrypt' ||
-    n === null ||
-    r === null ||
-    p === null ||
-    !isBase64Urlish(salt) ||
-    !isBase64Urlish(hash)
-  ) {
-    return false;
-  }
+  const parsedHash = parsePasswordHash(encodedHash);
+  if (parsedHash === null) return false;
 
   try {
-    const derivedKey = await scrypt(password, fromBase64Url(salt), KEY_LENGTH, {
-      N: n,
-      r,
-      p,
+    const derivedKey = await scrypt(password, parsedHash.salt, KEY_LENGTH, {
+      N: SCRYPT_N,
+      r: SCRYPT_R,
+      p: SCRYPT_P,
       maxmem: 64 * 1024 * 1024,
     });
 
-    return safeEqual(toBase64Url(derivedKey), hash);
+    return safeEqual(derivedKey, parsedHash.hash);
   } catch {
     return false;
   }
 }
 
-export function createSessionToken(siteId, passwordHash) {
+function createSessionTokenFromCanonicalHash(siteId, passwordHash) {
   const signature = createHmac('sha256', passwordHash)
     .update(`site:${siteId}`)
     .digest('base64url');
   return `v1.${signature}`;
 }
 
+export function createSessionToken(siteId, passwordHash) {
+  const parsedHash = parsePasswordHash(passwordHash);
+  if (parsedHash === null) {
+    throw new Error('Invalid password hash for site auth session token');
+  }
+
+  return createSessionTokenFromCanonicalHash(siteId, parsedHash.encodedHash);
+}
+
 export function verifySessionToken(token, siteId, passwordHash) {
+  const parsedHash = parsePasswordHash(passwordHash);
+  if (parsedHash === null) return false;
   if (typeof token !== 'string' || !token.startsWith('v1.')) return false;
-  return safeEqual(token, createSessionToken(siteId, passwordHash));
+  return safeEqual(
+    token,
+    createSessionTokenFromCanonicalHash(siteId, parsedHash.encodedHash)
+  );
 }
 
 export function parseCookies(cookieHeader = '') {
-  const cookies = {};
+  const cookies = Object.create(null);
 
   for (const part of String(cookieHeader).split(';')) {
     const trimmedPart = part.trim();
@@ -146,6 +169,7 @@ export function parseCookies(cookieHeader = '') {
     const value = decodeCookieValue(rawValue);
 
     if (name === null || value === null) continue;
+    if (Object.hasOwn(cookies, name)) continue;
     cookies[name] = value;
   }
 
