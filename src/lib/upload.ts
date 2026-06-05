@@ -175,6 +175,11 @@ export async function uploadSite(
 
   await ensureQuota(totalSize);
 
+  const prefix = findPrefix(allowedFiles);
+  if (prefix === null) {
+    throw new Error('找不到 index.html');
+  }
+
   const normalizedOptions = normalizePasswordOptions(options);
   const siteId = generateSiteId();
 

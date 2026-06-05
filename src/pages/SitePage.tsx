@@ -61,7 +61,7 @@ export default function SitePage() {
               </p>
             </header>
             <ResultCard
-              result={{ siteId: siteId!, url: siteUrl }}
+              result={{ siteId: siteId!, url: siteUrl, passwordEnabled: false }}
               onReset={() => navigate('/')}
               animate={false}
             />
