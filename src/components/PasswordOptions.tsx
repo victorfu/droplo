@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Lock } from 'lucide-react';
 import { useI18n } from '../lib/i18n';
 import type { PasswordOptionsProps } from '@/types';
@@ -11,6 +12,7 @@ export default function PasswordOptions({
   onPasswordChange,
 }: PasswordOptionsProps) {
   const { t } = useI18n();
+  const passwordDescriptionId = useId();
 
   return (
     <section className="rounded-xl glass px-4 py-3 space-y-3">
@@ -36,11 +38,19 @@ export default function PasswordOptions({
             value={password}
             disabled={disabled}
             minLength={4}
+            aria-label={t('password.label')}
+            aria-describedby={passwordDescriptionId}
+            aria-invalid={error ? true : undefined}
             onChange={(event) => onPasswordChange(event.target.value)}
             placeholder={t('password.placeholder')}
             className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:cursor-not-allowed"
           />
-          <p className={error ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
+          <p
+            id={passwordDescriptionId}
+            role={error ? 'alert' : undefined}
+            aria-live={error ? 'polite' : undefined}
+            className={error ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}
+          >
             {error || t('password.helper')}
           </p>
         </div>

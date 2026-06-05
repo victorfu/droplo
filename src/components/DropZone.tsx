@@ -13,6 +13,7 @@ export default function DropZone({ onFile, onFolder, isDragging = false }: DropZ
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = '';
 
     const htmlEntry = createSingleHtmlEntry(file);
     if (htmlEntry) {
@@ -26,8 +27,10 @@ export default function DropZone({ onFile, onFolder, isDragging = false }: DropZ
   const handleFolderInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (!fileList?.length) return;
+    const selectedFiles = [...fileList];
+    e.target.value = '';
 
-    const files = [...fileList]
+    const files = selectedFiles
       .filter((f) => !f.name.startsWith('.') && !f.webkitRelativePath.includes('__MACOSX'))
       .map((f) => ({
         path: f.webkitRelativePath.replace(/^[^/]+\//, ''),

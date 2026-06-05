@@ -16,6 +16,7 @@ import { createSingleHtmlEntry } from '../lib/singleHtmlUpload';
 import { useI18n } from '../lib/i18n';
 import { getPasswordValidationError, normalizePasswordOptions } from '../lib/passwordOptions';
 import type { UploadOptions } from '@/types';
+import type { PasswordValidationError } from '../lib/passwordOptions';
 
 export default function HomePage() {
   const { status, progress, result, error, upload, uploadFiles, reset } = useUpload();
@@ -24,7 +25,7 @@ export default function HomePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<PasswordValidationError | null>(null);
   const dragCounter = useRef(0);
 
   useEffect(() => {
@@ -36,13 +37,13 @@ export default function HomePage() {
   const getUploadOptions = useCallback((): UploadOptions | null => {
     const validationError = getPasswordValidationError({ passwordEnabled, password });
     if (validationError === 'tooShort') {
-      setPasswordError(t('password.errorTooShort'));
+      setPasswordError(validationError);
       return null;
     }
 
     setPasswordError(null);
     return normalizePasswordOptions({ passwordEnabled, password });
-  }, [passwordEnabled, password, t]);
+  }, [passwordEnabled, password]);
 
   const handleUploadFile = useCallback(
     (file: File) => {
@@ -193,7 +194,7 @@ export default function HomePage() {
                 <PasswordOptions
                   enabled={passwordEnabled}
                   password={password}
-                  error={passwordError}
+                  error={passwordError === 'tooShort' ? t('password.errorTooShort') : null}
                   onEnabledChange={(enabled) => {
                     setPasswordEnabled(enabled);
                     setPasswordError(null);
