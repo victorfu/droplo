@@ -14,6 +14,7 @@ const SCRYPT_N = 16384;
 const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const KEY_LENGTH = 64;
+const SITE_ID_PATH_PATTERN = /^[a-z0-9-]+$/i;
 
 function toBase64Url(value) {
   return Buffer.from(value).toString('base64url');
@@ -37,6 +38,12 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function validateCookiePathSiteId(siteId) {
+  if (typeof siteId !== 'string' || !SITE_ID_PATH_PATTERN.test(siteId)) {
+    throw new Error('Invalid siteId for site auth cookie path');
+  }
 }
 
 export async function hashPassword(password) {
@@ -106,6 +113,8 @@ export function getSessionToken(req) {
 }
 
 export function buildSessionCookie({ siteId, token, secure }) {
+  validateCookiePathSiteId(siteId);
+
   const parts = [
     `${COOKIE_NAME}=${encodeURIComponent(token)}`,
     `Path=/s/${siteId}`,

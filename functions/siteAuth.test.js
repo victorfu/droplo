@@ -20,10 +20,12 @@ test('hashPassword stores an encoded scrypt hash and verifyPassword checks it', 
 
 test('session tokens are tied to one site and password hash', async () => {
   const hash = await hashPassword('abcd');
+  const otherHash = await hashPassword('wxyz');
   const token = createSessionToken('site123', hash);
 
   assert.equal(verifySessionToken(token, 'site123', hash), true);
   assert.equal(verifySessionToken(token, 'other-site', hash), false);
+  assert.equal(verifySessionToken(token, 'site123', otherHash), false);
   assert.equal(verifySessionToken('bad-token', 'site123', hash), false);
 });
 
@@ -39,6 +41,22 @@ test('buildSessionCookie creates a session-only HttpOnly cookie scoped to the si
   assert.match(cookie, /Secure/);
   assert.doesNotMatch(cookie, /Max-Age=/);
   assert.doesNotMatch(cookie, /Expires=/);
+});
+
+test('buildSessionCookie rejects invalid site path siteIds before building a cookie', () => {
+  let cookie = '';
+
+  assert.throws(
+    () => {
+      cookie = buildSessionCookie({
+        siteId: 'site123; Max-Age=3600',
+        token: 'token',
+        secure: true,
+      });
+    },
+    /Invalid siteId/
+  );
+  assert.doesNotMatch(cookie, /Max-Age/);
 });
 
 test('getRequestPassword reads form-urlencoded passwords from rawBody', () => {
