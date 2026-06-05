@@ -173,6 +173,8 @@ export async function uploadSite(
     throw new Error(`網站總大小超過上限（最大 50MB）`);
   }
 
+  const normalizedOptions = normalizePasswordOptions(options);
+
   await ensureQuota(totalSize);
 
   const prefix = findPrefix(allowedFiles);
@@ -180,7 +182,6 @@ export async function uploadSite(
     throw new Error('找不到 index.html');
   }
 
-  const normalizedOptions = normalizePasswordOptions(options);
   const siteId = generateSiteId();
 
   if (normalizedOptions.passwordEnabled) {
@@ -233,6 +234,8 @@ export async function uploadFolder(
     throw new Error(`網站總大小超過上限（最大 50MB）`);
   }
 
+  const normalizedOptions = normalizePasswordOptions(options);
+
   await ensureQuota(totalSize);
 
   const prefix = findPrefix(allowedFiles);
@@ -240,7 +243,6 @@ export async function uploadFolder(
     throw new Error('資料夾裡找不到 index.html');
   }
 
-  const normalizedOptions = normalizePasswordOptions(options);
   const siteId = generateSiteId();
 
   if (normalizedOptions.passwordEnabled) {

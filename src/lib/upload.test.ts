@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { uploadSite } from './upload';
+import { uploadFolder, uploadSite } from './upload';
+import type { FileEntry } from '@/types';
 
 interface MockZipEntry {
   dir: boolean;
@@ -142,6 +143,19 @@ function createZip(files: Record<string, string>): MockZip {
   return { files: zipFiles };
 }
 
+function createFolderEntries(files: Record<string, string>): FileEntry[] {
+  return Object.entries(files).map(([path, content]) => ({
+    path,
+    file: textBuffer(content),
+  }));
+}
+
+function callIndex(name: string): number {
+  const index = mocks.callOrder.indexOf(name);
+  expect(index).toBeGreaterThanOrEqual(0);
+  return index;
+}
+
 describe('uploadSite password orchestration', () => {
   beforeEach(() => {
     mocks.reset();
@@ -152,7 +166,7 @@ describe('uploadSite password orchestration', () => {
     vi.unstubAllGlobals();
   });
 
-  it('creates the password secret before the public site document for protected uploads', async () => {
+  it('creates the password secret before storage upload for protected ZIP uploads', async () => {
     mocks.loadZip.mockResolvedValue(createZip({ 'index.html': '<main>Hello</main>' }));
 
     const result = await uploadSite(
@@ -162,9 +176,7 @@ describe('uploadSite password orchestration', () => {
     );
 
     expect(mocks.createSecretPayloads).toEqual([{ siteId: 'site123', password: 'secret' }]);
-    expect(mocks.callOrder.indexOf('createSiteSecret')).toBeLessThan(
-      mocks.callOrder.indexOf('addDoc')
-    );
+    expect(callIndex('createSiteSecret')).toBeLessThan(callIndex('uploadBytes'));
     expect(mocks.addDocPayloads).toContainEqual(
       expect.objectContaining({
         passwordEnabled: true,
@@ -211,6 +223,95 @@ describe('uploadSite password orchestration', () => {
 
     expect(mocks.callOrder).not.toContain('createSiteSecret');
     expect(mocks.createSecretPayloads).toEqual([]);
+    expect(mocks.addDocPayloads).toEqual([]);
+  });
+
+  it('rejects short protected ZIP passwords before reserving upload quota', async () => {
+    mocks.loadZip.mockResolvedValue(createZip({ 'index.html': '<main>Hello</main>' }));
+
+    await expect(
+      uploadSite(
+        new File(['zip'], 'site.zip'),
+        () => undefined,
+        { passwordEnabled: true, password: 'abc' }
+      )
+    ).rejects.toThrow('PASSWORD_TOO_SHORT');
+
+    expect(mocks.callOrder).not.toContain('prepareUpload');
+    expect(mocks.callOrder).not.toContain('createSiteSecret');
+    expect(mocks.addDocPayloads).toEqual([]);
+  });
+});
+
+describe('uploadFolder password orchestration', () => {
+  beforeEach(() => {
+    mocks.reset();
+    vi.stubGlobal('window', { location: { origin: 'https://droplo.test' } });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('creates the password secret before storage upload for protected folder uploads', async () => {
+    const result = await uploadFolder(
+      createFolderEntries({
+        'index.html': '<main>Hello</main>',
+        'styles.css': 'body { color: red; }',
+      }),
+      () => undefined,
+      { passwordEnabled: true, password: ' secret ' }
+    );
+
+    expect(mocks.createSecretPayloads).toEqual([{ siteId: 'site123', password: 'secret' }]);
+    expect(callIndex('createSiteSecret')).toBeLessThan(callIndex('uploadBytes'));
+    expect(mocks.addDocPayloads).toContainEqual(
+      expect.objectContaining({
+        originalName: 'folder-upload',
+        passwordEnabled: true,
+        siteId: 'site123',
+      })
+    );
+    expect(result).toEqual({
+      passwordEnabled: true,
+      siteId: 'site123',
+      url: 'https://droplo.test/s/site123/',
+    });
+  });
+
+  it('skips password secret creation for unprotected folder uploads', async () => {
+    const result = await uploadFolder(
+      createFolderEntries({ 'index.html': '<main>Hello</main>' }),
+      () => undefined
+    );
+
+    expect(mocks.callOrder).not.toContain('createSiteSecret');
+    expect(mocks.createSecretPayloads).toEqual([]);
+    expect(mocks.addDocPayloads).toContainEqual(
+      expect.objectContaining({
+        originalName: 'folder-upload',
+        passwordEnabled: false,
+        siteId: 'site123',
+      })
+    );
+    expect(result).toEqual({
+      passwordEnabled: false,
+      siteId: 'site123',
+      url: 'https://droplo.test/s/site123/',
+    });
+  });
+
+  it('rejects short protected folder passwords before reserving upload quota', async () => {
+    await expect(
+      uploadFolder(
+        createFolderEntries({ 'index.html': '<main>Hello</main>' }),
+        () => undefined,
+        { passwordEnabled: true, password: 'abc' }
+      )
+    ).rejects.toThrow('PASSWORD_TOO_SHORT');
+
+    expect(mocks.callOrder).not.toContain('prepareUpload');
+    expect(mocks.callOrder).not.toContain('createSiteSecret');
     expect(mocks.addDocPayloads).toEqual([]);
   });
 });
