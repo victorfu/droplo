@@ -33,12 +33,32 @@ firebase use "$FIREBASE_PROJECT"
 firebase target:clear hosting app 2>/dev/null || true
 firebase target:apply hosting app "$HOSTING_SITE"
 
+# 部署
+TARGET="${1:-all}"
+
+needs_functions_deps() {
+  if [[ "$TARGET" == "all" ]]; then
+    return 0
+  fi
+
+  IFS=',' read -ra deploy_targets <<< "$TARGET"
+  for deploy_target in "${deploy_targets[@]}"; do
+    if [[ "$deploy_target" == functions* ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 # 建置前端
 echo "Building frontend..."
 npm run build
 
-# 部署
-TARGET="${1:-all}"
+if needs_functions_deps; then
+  echo "Installing functions dependencies..."
+  npm --prefix functions ci
+fi
 
 case "$TARGET" in
   all)
