@@ -9,6 +9,7 @@ export interface UploadProgress {
 export interface UploadResult {
   siteId: string;
   url: string;
+  passwordEnabled: boolean;
 }
 
 export type UploadOptions =
@@ -20,8 +21,8 @@ export interface UseUploadReturn {
   progress: UploadProgress;
   result: UploadResult | null;
   error: string | null;
-  upload: (file: File) => Promise<void>;
-  uploadFiles: (fileList: FileEntry[]) => Promise<void>;
+  upload: (file: File, options?: UploadOptions) => Promise<void>;
+  uploadFiles: (fileList: FileEntry[], options?: UploadOptions) => Promise<void>;
   reset: () => void;
 }
 

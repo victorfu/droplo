@@ -4,7 +4,9 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { storage, db, waitForAuth, functions } from './firebase';
 import { generateSiteId, getMimeType, isAllowedFile } from './utils';
-import type { FileEntry, ProgressCallback } from '@/types';
+import { buildSiteDocument } from './uploadMetadata';
+import { normalizePasswordOptions } from './passwordOptions';
+import type { FileEntry, ProgressCallback, UploadOptions, UploadResult } from '@/types';
 
 const MAX_SITE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_FILE_COUNT = 500;
@@ -14,6 +16,18 @@ async function ensureQuota(estimatedSize: number): Promise<void> {
   const { data } = await prepareUpload({ estimatedSize });
   if (!data.ok) {
     throw new Error(data.reason || '儲存空間不足');
+  }
+}
+
+async function createSiteSecret(siteId: string, password: string): Promise<void> {
+  const createSecret = httpsCallable<
+    { siteId: string; password: string },
+    { ok: boolean; reason?: string }
+  >(functions, 'createSiteSecret');
+
+  const { data } = await createSecret({ siteId, password });
+  if (!data.ok) {
+    throw new Error(data.reason || '密碼保護設定失敗');
   }
 }
 
@@ -123,8 +137,9 @@ async function uploadFilesToStorage(
 
 export async function uploadSite(
   zipFile: File,
-  onProgress: ProgressCallback
-): Promise<{ siteId: string; url: string }> {
+  onProgress: ProgressCallback,
+  options?: UploadOptions
+): Promise<UploadResult> {
   const user = await waitForAuth();
   onProgress({ stage: 'unzipping', current: 0, total: 0 });
   const zip = await JSZip.loadAsync(zipFile);
@@ -160,27 +175,38 @@ export async function uploadSite(
 
   await ensureQuota(totalSize);
 
+  const normalizedOptions = normalizePasswordOptions(options);
   const siteId = generateSiteId();
+
+  if (normalizedOptions.passwordEnabled) {
+    await createSiteSecret(siteId, normalizedOptions.password);
+  }
+
   await uploadFilesToStorage(allowedFiles, siteId, onProgress);
 
   onProgress({ stage: 'saving' });
-  await addDoc(collection(db, 'sites'), {
-    siteId,
-    uid: user.uid,
-    fileCount: allowedFiles.length,
-    totalSize,
-    originalName: zipFile.name,
-    createdAt: serverTimestamp(),
-  });
+  await addDoc(
+    collection(db, 'sites'),
+    buildSiteDocument({
+      siteId,
+      uid: user.uid,
+      fileCount: allowedFiles.length,
+      totalSize,
+      originalName: zipFile.name,
+      createdAt: serverTimestamp(),
+      passwordEnabled: normalizedOptions.passwordEnabled,
+    })
+  );
 
   const siteUrl = `${window.location.origin}/s/${siteId}/`;
-  return { siteId, url: siteUrl };
+  return { siteId, url: siteUrl, passwordEnabled: normalizedOptions.passwordEnabled };
 }
 
 export async function uploadFolder(
   fileList: FileEntry[],
-  onProgress: ProgressCallback
-): Promise<{ siteId: string; url: string }> {
+  onProgress: ProgressCallback,
+  options?: UploadOptions
+): Promise<UploadResult> {
   const user = await waitForAuth();
   const files = filterFiles(fileList);
 
@@ -209,20 +235,30 @@ export async function uploadFolder(
     throw new Error('資料夾裡找不到 index.html');
   }
 
+  const normalizedOptions = normalizePasswordOptions(options);
   const siteId = generateSiteId();
+
+  if (normalizedOptions.passwordEnabled) {
+    await createSiteSecret(siteId, normalizedOptions.password);
+  }
+
   onProgress({ stage: 'uploading', current: 0, total: allowedFiles.length });
   await uploadFilesToStorage(allowedFiles, siteId, onProgress);
 
   onProgress({ stage: 'saving' });
-  await addDoc(collection(db, 'sites'), {
-    siteId,
-    uid: user.uid,
-    fileCount: allowedFiles.length,
-    totalSize,
-    originalName: 'folder-upload',
-    createdAt: serverTimestamp(),
-  });
+  await addDoc(
+    collection(db, 'sites'),
+    buildSiteDocument({
+      siteId,
+      uid: user.uid,
+      fileCount: allowedFiles.length,
+      totalSize,
+      originalName: 'folder-upload',
+      createdAt: serverTimestamp(),
+      passwordEnabled: normalizedOptions.passwordEnabled,
+    })
+  );
 
   const siteUrl = `${window.location.origin}/s/${siteId}/`;
-  return { siteId, url: siteUrl };
+  return { siteId, url: siteUrl, passwordEnabled: normalizedOptions.passwordEnabled };
 }

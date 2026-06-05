@@ -1,6 +1,13 @@
 import { useState, useCallback } from 'react';
 import { uploadSite, uploadFolder } from '../lib/upload';
-import type { UploadStatus, UploadProgress, UploadResult, UseUploadReturn, FileEntry } from '@/types';
+import type {
+  UploadStatus,
+  UploadProgress,
+  UploadResult,
+  UseUploadReturn,
+  FileEntry,
+  UploadOptions,
+} from '@/types';
 
 export function useUpload(): UseUploadReturn {
   const [status, setStatus] = useState<UploadStatus>('idle');
@@ -23,14 +30,14 @@ export function useUpload(): UseUploadReturn {
     setProgress({ current: current ?? 0, total: total ?? 0, fileName: fileName ?? '' });
   };
 
-  const upload = useCallback(async (file: File) => {
+  const upload = useCallback(async (file: File, options?: UploadOptions) => {
     setStatus('unzipping');
     setError(null);
     setResult(null);
 
     try {
-      const { siteId, url } = await uploadSite(file, handleProgress);
-      setResult({ siteId, url });
+      const uploadResult = await uploadSite(file, handleProgress, options);
+      setResult(uploadResult);
       setStatus('done');
     } catch (err) {
       console.error('[Droplo] Upload failed:', err);
@@ -39,14 +46,14 @@ export function useUpload(): UseUploadReturn {
     }
   }, []);
 
-  const uploadFiles = useCallback(async (fileList: FileEntry[]) => {
+  const uploadFiles = useCallback(async (fileList: FileEntry[], options?: UploadOptions) => {
     setStatus('uploading');
     setError(null);
     setResult(null);
 
     try {
-      const { siteId, url } = await uploadFolder(fileList, handleProgress);
-      setResult({ siteId, url });
+      const uploadResult = await uploadFolder(fileList, handleProgress, options);
+      setResult(uploadResult);
       setStatus('done');
     } catch (err) {
       console.error('[Droplo] Folder upload failed:', err);
