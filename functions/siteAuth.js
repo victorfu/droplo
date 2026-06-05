@@ -15,6 +15,7 @@ const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const KEY_LENGTH = 64;
 const SITE_ID_PATH_PATTERN = /^[a-z0-9-]+$/i;
+const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 function toBase64Url(value) {
   return Buffer.from(value).toString('base64url');
@@ -38,6 +39,25 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function parsePositiveInteger(value) {
+  if (!/^\d+$/.test(value)) return null;
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number <= 0) return null;
+  return number;
+}
+
+function isBase64Urlish(value) {
+  return typeof value === 'string' && BASE64URL_PATTERN.test(value);
+}
+
+function decodeCookieValue(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
 }
 
 function validateCookiePathSiteId(siteId) {
@@ -66,17 +86,37 @@ export async function hashPassword(password) {
 }
 
 export async function verifyPassword(password, encodedHash) {
-  const [algorithm, n, r, p, salt, hash] = String(encodedHash).split('$');
-  if (algorithm !== 'scrypt' || !n || !r || !p || !salt || !hash) return false;
+  const parts = String(encodedHash).split('$');
+  if (parts.length !== 6) return false;
 
-  const derivedKey = await scrypt(password, fromBase64Url(salt), KEY_LENGTH, {
-    N: Number(n),
-    r: Number(r),
-    p: Number(p),
-    maxmem: 64 * 1024 * 1024,
-  });
+  const [algorithm, nValue, rValue, pValue, salt, hash] = parts;
+  const n = parsePositiveInteger(nValue);
+  const r = parsePositiveInteger(rValue);
+  const p = parsePositiveInteger(pValue);
 
-  return safeEqual(toBase64Url(derivedKey), hash);
+  if (
+    algorithm !== 'scrypt' ||
+    n === null ||
+    r === null ||
+    p === null ||
+    !isBase64Urlish(salt) ||
+    !isBase64Urlish(hash)
+  ) {
+    return false;
+  }
+
+  try {
+    const derivedKey = await scrypt(password, fromBase64Url(salt), KEY_LENGTH, {
+      N: n,
+      r,
+      p,
+      maxmem: 64 * 1024 * 1024,
+    });
+
+    return safeEqual(toBase64Url(derivedKey), hash);
+  } catch {
+    return false;
+  }
 }
 
 export function createSessionToken(siteId, passwordHash) {
@@ -92,20 +132,24 @@ export function verifySessionToken(token, siteId, passwordHash) {
 }
 
 export function parseCookies(cookieHeader = '') {
-  return Object.fromEntries(
-    String(cookieHeader)
-      .split(';')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const separator = part.indexOf('=');
-        if (separator === -1) return [part, ''];
-        return [
-          decodeURIComponent(part.slice(0, separator)),
-          decodeURIComponent(part.slice(separator + 1)),
-        ];
-      })
-  );
+  const cookies = {};
+
+  for (const part of String(cookieHeader).split(';')) {
+    const trimmedPart = part.trim();
+    if (!trimmedPart) continue;
+
+    const separator = trimmedPart.indexOf('=');
+    const rawName =
+      separator === -1 ? trimmedPart : trimmedPart.slice(0, separator);
+    const rawValue = separator === -1 ? '' : trimmedPart.slice(separator + 1);
+    const name = decodeCookieValue(rawName);
+    const value = decodeCookieValue(rawValue);
+
+    if (name === null || value === null) continue;
+    cookies[name] = value;
+  }
+
+  return cookies;
 }
 
 export function getSessionToken(req) {

@@ -4,6 +4,7 @@ import {
   buildSessionCookie,
   createSessionToken,
   getRequestPassword,
+  getSessionToken,
   hashPassword,
   renderPasswordPage,
   verifyPassword,
@@ -16,6 +17,30 @@ test('hashPassword stores an encoded scrypt hash and verifyPassword checks it', 
   assert.match(hash, /^scrypt\$/);
   assert.equal(await verifyPassword('abcd', hash), true);
   assert.equal(await verifyPassword('wrong', hash), false);
+});
+
+test('verifyPassword fails closed for malformed encoded hashes', async () => {
+  const validHash = await hashPassword('abcd');
+  const [, n, r, p, salt, hash] = validHash.split('$');
+  const malformedHashes = [
+    `${validHash}$extra`,
+    `scrypt$foo$${r}$${p}$${salt}$${hash}`,
+    `scrypt$${n}$bar$${p}$${salt}$${hash}`,
+    `scrypt$${n}$${r}$baz$${salt}$${hash}`,
+    `scrypt$1$${r}$${p}$${salt}$${hash}`,
+    `scrypt$${n}$${r}$0$${salt}$${hash}`,
+    `scrypt$${n}$${r}$${p}`,
+    `scrypt$${n}$${r}$${p}$$${hash}`,
+    `scrypt$${n}$${r}$${p}$${salt}$`,
+    `scrypt$${n}$${r}$${p}$%%%$${hash}`,
+    `scrypt$${n}$${r}$${p}$${salt}$%%%`,
+  ];
+
+  for (const malformedHash of malformedHashes) {
+    await assert.doesNotReject(async () => {
+      assert.equal(await verifyPassword('abcd', malformedHash), false);
+    });
+  }
 });
 
 test('session tokens are tied to one site and password hash', async () => {
@@ -57,6 +82,13 @@ test('buildSessionCookie rejects invalid site path siteIds before building a coo
     /Invalid siteId/
   );
   assert.doesNotMatch(cookie, /Max-Age/);
+});
+
+test('getSessionToken ignores malformed percent-encoded cookie parts', () => {
+  assert.equal(
+    getSessionToken({ headers: { cookie: 'droplo_site_auth=%' } }),
+    ''
+  );
 });
 
 test('getRequestPassword reads form-urlencoded passwords from rawBody', () => {
