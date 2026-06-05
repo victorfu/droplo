@@ -153,6 +153,72 @@ test('protected request without valid auth returns password page before Storage 
   assert.deepEqual(bucket.reads, []);
 });
 
+test('correct protected password sets session cookie and redirects to original query before Storage read', async () => {
+  const passwordHash = await hashPassword('abcd');
+  const firestore = createFirestore({
+    sites: [{ data: { siteId: 'site123', passwordEnabled: true } }],
+    secrets: { site123: { passwordHash } },
+  });
+  const bucket = createBucket({
+    'sites/site123/index.html': '<!doctype html>',
+  });
+  const handler = createServeSiteHandler({
+    firestore,
+    bucketFactory: () => bucket,
+  });
+  const res = createResponse();
+
+  await handler(
+    createRequest({
+      method: 'POST',
+      originalUrl: '/s/site123/index.html?preview=1',
+      url: '/s/site123/index.html?preview=1',
+      secure: false,
+      headers: { 'x-forwarded-proto': 'https' },
+      rawBody: Buffer.from('password=abcd'),
+    }),
+    res
+  );
+
+  assert.equal(res.statusCode, 303);
+  assert.equal(res.redirectTarget, '/s/site123/index.html?preview=1');
+  assert.match(res.headers['Set-Cookie'], /^__session=/);
+  assert.match(res.headers['Set-Cookie'], /Path=\/s\/site123/);
+  assert.match(res.headers['Set-Cookie'], /HttpOnly/);
+  assert.match(res.headers['Set-Cookie'], /Secure/);
+  assert.equal(res.headers['Cache-Control'], 'no-store');
+  assert.deepEqual(bucket.reads, []);
+});
+
+test('protected password page rejects scheme-relative redirect targets', async () => {
+  const passwordHash = await hashPassword('abcd');
+  const firestore = createFirestore({
+    sites: [{ data: { siteId: 'site123', passwordEnabled: true } }],
+    secrets: { site123: { passwordHash } },
+  });
+  const bucket = createBucket({
+    'sites/site123/index.html': '<!doctype html>',
+  });
+  const handler = createServeSiteHandler({
+    firestore,
+    bucketFactory: () => bucket,
+  });
+  const res = createResponse();
+
+  await handler(
+    createRequest({
+      originalUrl: '//evil.example/steal?next=/s/site123/index.html',
+      url: '//evil.example/steal?next=/s/site123/index.html',
+    }),
+    res
+  );
+
+  assert.equal(res.statusCode, 401);
+  assert.match(res.body, /<form method="post" action="\/s\/site123\/index\.html">/);
+  assert.doesNotMatch(res.body, /evil\.example/);
+  assert.deepEqual(bucket.reads, []);
+});
+
 test('duplicate site metadata fails closed before Storage read', async () => {
   const firestore = createFirestore({
     sites: [

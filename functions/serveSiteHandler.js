@@ -174,6 +174,7 @@ export async function handleServeSiteRequest(req, res, {
                 secure: isSecureRequest(req),
               })
             );
+            res.set({ 'Cache-Control': 'no-store' });
             res.redirect(303, requestTarget);
             return;
           }
