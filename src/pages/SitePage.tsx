@@ -15,11 +15,20 @@ export default function SitePage() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const [state, setState] = useState<'loading' | 'found' | 'notfound'>('loading');
+  const [site, setSite] = useState<{ passwordEnabled: boolean } | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'sites'), where('siteId', '==', siteId));
     getDocs(q).then((snapshot) => {
-      setState(snapshot.empty ? 'notfound' : 'found');
+      if (snapshot.empty) {
+        setState('notfound');
+        setSite(null);
+        return;
+      }
+
+      const data = snapshot.docs[0].data();
+      setSite({ passwordEnabled: data.passwordEnabled === true });
+      setState('found');
     });
   }, [siteId]);
 
@@ -61,7 +70,11 @@ export default function SitePage() {
               </p>
             </header>
             <ResultCard
-              result={{ siteId: siteId!, url: siteUrl, passwordEnabled: false }}
+              result={{
+                siteId: siteId!,
+                url: siteUrl,
+                passwordEnabled: site?.passwordEnabled === true,
+              }}
               onReset={() => navigate('/')}
               animate={false}
             />

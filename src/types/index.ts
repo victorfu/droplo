@@ -32,6 +32,15 @@ export interface DropZoneProps {
   isDragging?: boolean;
 }
 
+export interface PasswordOptionsProps {
+  enabled: boolean;
+  password: string;
+  error: string | null;
+  disabled?: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  onPasswordChange: (password: string) => void;
+}
+
 export interface ResultCardProps {
   result: UploadResult;
   onReset: () => void;

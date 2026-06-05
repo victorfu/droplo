@@ -5,6 +5,7 @@ import { useUpload } from '../hooks/useUpload';
 import DropZone from '../components/DropZone';
 import UploadProgress from '../components/UploadProgress';
 import ResultCard from '../components/ResultCard';
+import PasswordOptions from '../components/PasswordOptions';
 import ThemeToggle from '../components/ThemeToggle';
 import Features from '../components/Features';
 import HowItWorks from '../components/HowItWorks';
@@ -13,12 +14,17 @@ import { FolderOpen } from 'lucide-react';
 import { readDroppedFolder } from '../lib/upload';
 import { createSingleHtmlEntry } from '../lib/singleHtmlUpload';
 import { useI18n } from '../lib/i18n';
+import { getPasswordValidationError, normalizePasswordOptions } from '../lib/passwordOptions';
+import type { UploadOptions } from '@/types';
 
 export default function HomePage() {
   const { status, progress, result, error, upload, uploadFiles, reset } = useUpload();
   const navigate = useNavigate();
   const { t } = useI18n();
   const [isDragging, setIsDragging] = useState(false);
+  const [passwordEnabled, setPasswordEnabled] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const dragCounter = useRef(0);
 
   useEffect(() => {
@@ -26,6 +32,35 @@ export default function HomePage() {
       navigate(`/${result.siteId}`);
     }
   }, [status, result, navigate]);
+
+  const getUploadOptions = useCallback((): UploadOptions | null => {
+    const validationError = getPasswordValidationError({ passwordEnabled, password });
+    if (validationError === 'tooShort') {
+      setPasswordError(t('password.errorTooShort'));
+      return null;
+    }
+
+    setPasswordError(null);
+    return normalizePasswordOptions({ passwordEnabled, password });
+  }, [passwordEnabled, password, t]);
+
+  const handleUploadFile = useCallback(
+    (file: File) => {
+      const options = getUploadOptions();
+      if (!options) return;
+      upload(file, options);
+    },
+    [getUploadOptions, upload]
+  );
+
+  const handleUploadFiles = useCallback(
+    (files: Parameters<typeof uploadFiles>[0]) => {
+      const options = getUploadOptions();
+      if (!options) return;
+      uploadFiles(files, options);
+    },
+    [getUploadOptions, uploadFiles]
+  );
 
   const handleDrop = useCallback(
     async (e: React.DragEvent<HTMLDivElement>) => {
@@ -40,17 +75,17 @@ export default function HomePage() {
 
       if (firstEntry?.isDirectory) {
         const files = await readDroppedFolder(e.dataTransfer);
-        uploadFiles(files);
+        handleUploadFiles(files);
         return;
       }
 
       const file = e.dataTransfer.files[0];
       if (file?.type === 'application/zip' || file?.name.endsWith('.zip')) {
-        upload(file);
+        handleUploadFile(file);
       } else if (file) {
         const htmlEntry = createSingleHtmlEntry(file);
         if (htmlEntry) {
-          uploadFiles([htmlEntry]);
+          handleUploadFiles([htmlEntry]);
           return;
         }
 
@@ -59,11 +94,14 @@ export default function HomePage() {
         alert(t('upload.alertZipOnly'));
       }
     },
-    [status, upload, uploadFiles]
+    [status, handleUploadFile, handleUploadFiles, t]
   );
 
   const handleReset = useCallback(() => {
     setIsDragging(false);
+    setPasswordEnabled(false);
+    setPassword('');
+    setPasswordError(null);
     dragCounter.current = 0;
     reset();
   }, [reset]);
@@ -146,7 +184,26 @@ export default function HomePage() {
 
             {/* Content */}
             {status === 'idle' && (
-              <DropZone onFile={upload} onFolder={uploadFiles} isDragging={isDragging} />
+              <div className="space-y-3">
+                <DropZone
+                  onFile={handleUploadFile}
+                  onFolder={handleUploadFiles}
+                  isDragging={isDragging}
+                />
+                <PasswordOptions
+                  enabled={passwordEnabled}
+                  password={password}
+                  error={passwordError}
+                  onEnabledChange={(enabled) => {
+                    setPasswordEnabled(enabled);
+                    setPasswordError(null);
+                  }}
+                  onPasswordChange={(value) => {
+                    setPassword(value);
+                    setPasswordError(null);
+                  }}
+                />
+              </div>
             )}
 
             {(status === 'unzipping' || status === 'uploading' || status === 'saving') && (

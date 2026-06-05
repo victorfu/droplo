@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Copy, ArrowUpRight, Plus } from 'lucide-react';
+import { Check, Copy, ArrowUpRight, Plus, Lock } from 'lucide-react';
 import { useI18n } from '../lib/i18n';
 import type { ResultCardProps } from '@/types';
 
@@ -105,6 +105,15 @@ export default function ResultCard({ result, onReset, animate = true }: ResultCa
           {t('result.description')}
         </p>
       </div>
+
+      {result.passwordEnabled && (
+        <div className="flex justify-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
+            <Lock className="w-3.5 h-3.5" />
+            {t('result.passwordProtected')}
+          </span>
+        </div>
+      )}
 
       {/* URL box */}
       <motion.div

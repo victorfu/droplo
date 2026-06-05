@@ -30,9 +30,17 @@ export const zhTW = {
     title: '放開以上傳',
     subtitle: '支援資料夾、.zip 或 HTML 檔案',
   },
+  password: {
+    label: '密碼保護',
+    toggle: '切換密碼保護',
+    placeholder: '請輸入至少 4 個字元',
+    helper: '訪客每個瀏覽器工作階段只需輸入一次。',
+    errorTooShort: '密碼至少需要 4 個字元。',
+  },
   result: {
     title: '部署完成',
     description: '你的網站已上線，任何人都可以訪問',
+    passwordProtected: '已啟用密碼保護',
     copyUrl: '複製網址',
     openSite: '開啟網站',
     uploadMore: '再上傳',

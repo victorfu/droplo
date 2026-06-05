@@ -30,9 +30,17 @@ export const en = {
     title: 'Release to upload',
     subtitle: 'Supports folders, .zip, or HTML files',
   },
+  password: {
+    label: 'Password protection',
+    toggle: 'Toggle password protection',
+    placeholder: 'Enter at least 4 characters',
+    helper: 'Visitors will enter this once per browser session.',
+    errorTooShort: 'Password must be at least 4 characters.',
+  },
   result: {
     title: 'Deployed!',
     description: 'Your site is live and accessible to anyone',
+    passwordProtected: 'Password protected',
     copyUrl: 'Copy URL',
     openSite: 'Open Site',
     uploadMore: 'Upload Another',
