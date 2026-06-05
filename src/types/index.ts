@@ -11,6 +11,10 @@ export interface UploadResult {
   url: string;
 }
 
+export type UploadOptions =
+  | { passwordEnabled: false; password?: undefined }
+  | { passwordEnabled: true; password: string };
+
 export interface UseUploadReturn {
   status: UploadStatus;
   progress: UploadProgress;
