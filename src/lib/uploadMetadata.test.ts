@@ -27,7 +27,10 @@ describe('buildSiteDocument', () => {
   });
 
   it('builds public metadata for protected sites without password secrets', () => {
-    const doc = buildSiteDocument({
+    const input: Parameters<typeof buildSiteDocument>[0] & {
+      password: string;
+      passwordHash: string;
+    } = {
       siteId: 'site456',
       uid: 'user456',
       fileCount: 1,
@@ -35,7 +38,11 @@ describe('buildSiteDocument', () => {
       originalName: 'folder-upload',
       createdAt,
       passwordEnabled: true,
-    });
+      password: 'plain-secret',
+      passwordHash: 'hashed-secret',
+    };
+
+    const doc = buildSiteDocument(input);
 
     expect(doc).toEqual({
       siteId: 'site456',
