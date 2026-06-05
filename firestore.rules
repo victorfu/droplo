@@ -7,5 +7,9 @@ service cloud.firestore {
                     && request.resource.data.uid == request.auth.uid;
       allow update, delete: if false;
     }
+
+    match /siteSecrets/{siteId} {
+      allow read, write: if false;
+    }
   }
 }
