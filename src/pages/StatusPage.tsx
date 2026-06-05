@@ -50,7 +50,7 @@ export default function StatusPage() {
   return (
     <PageLayout title={t('status.title')}>
       <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
-        <StatusRow name="Firebase Hosting" status="operational" labels={labels} />
+        <StatusRow name="Google Hosting" status="operational" labels={labels} />
         <StatusRow name="Cloud Functions" status="operational" labels={labels} />
         <StatusRow name="Firestore Database" status={firestore} labels={labels} />
         <StatusRow name="Cloud Storage" status="operational" labels={labels} />
