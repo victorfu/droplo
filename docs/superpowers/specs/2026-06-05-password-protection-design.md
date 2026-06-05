@@ -11,9 +11,9 @@ When password protection is enabled, the uploader sets a password before upload.
 - Keep the current no-password upload flow as the default.
 - Let uploaders enable password protection before starting an upload.
 - Require at least 4 characters for protected site passwords.
-- Enforce password access in the Firebase Cloud Function that serves `/s/**` files.
+- Enforce best-effort password access in the Firebase Cloud Function that serves `/s/**` files.
 - Remember successful access only for the current browser session.
-- Protect all hosted files, including `index.html`, CSS, JavaScript, images, and direct asset URLs.
+- Gate hosted file requests handled by `serveSite`, including `index.html`, CSS, JavaScript, images, and direct asset URLs.
 - Keep the feature lightweight and compatible with Droplo's no-account product model.
 
 ## Non-Goals
@@ -24,10 +24,13 @@ When password protection is enabled, the uploader sets a password before upload.
 - No password recovery.
 - No invite lists, per-user permissions, or analytics.
 - No persistent "remember me" beyond the browser session.
+- No hostile-JavaScript isolation between uploaded sites on the same Firebase Hosting origin.
 
 ## Current Context
 
 The app uploads static files to Firebase Storage under `sites/{siteId}/...` and creates a Firestore document in the `sites` collection. Firebase Hosting rewrites `/s/**` to the `serveSite` Cloud Function. `serveSite` reads files from Storage through the Admin SDK and returns them with content type and security headers.
+
+All uploaded sites share the same Firebase Hosting origin and are separated only by path. This implementation is a best-effort password gate on that current architecture; it does not isolate protected content from malicious JavaScript running in another uploaded same-origin site.
 
 Today, Storage read rules are public. For password protection to be meaningful, direct client reads from Storage must no longer be public; hosted files will be served through `serveSite`.
 
@@ -53,7 +56,7 @@ After a protected upload completes, the result card will show a small "password 
 
 Visitors to a protected site who have not yet authenticated see a simple password page returned by the Cloud Function. This page posts the password back to the same protected URL. It does not load the React app, because the protected site route is handled by the hosting rewrite and must protect the uploaded site's own files.
 
-After successful verification, the visitor is redirected to the originally requested path. For example, a visitor who requested `/s/site-id/about.html` returns to that path after entering the correct password.
+After successful verification, the visitor is redirected to the originally requested relative URL, including the query string. For example, a visitor who requested `/s/site-id/about.html?preview=1` returns to that URL after entering the correct password.
 
 ## Data Model
 
@@ -90,18 +93,19 @@ Password hashing happens in Cloud Functions, not in the browser. This keeps hash
 `serveSite` handles all `/s/**` requests:
 
 1. Parse and validate `siteId` and requested file path as it does today.
-2. Query Firestore for the matching site metadata.
+2. Query Firestore for the matching site metadata and detect duplicate `siteId` metadata.
 3. If no matching site document exists, return `404`.
-4. If the site is not password protected, serve the requested file.
-5. If the site is password protected, load `siteSecrets/{siteId}` and verify the session cookie for this `siteId`.
-6. If the cookie is valid, serve the requested file.
-7. If there is no valid cookie and the request is `GET`, return the password page.
-8. If the visitor submits a password with `POST` and it is wrong, return the password page with a conservative error message.
-9. If the visitor submits the correct password, set a session-only `HttpOnly` cookie scoped to the protected site path and redirect to the original path.
+4. If more than one site document has the same `siteId`, return a generic `500` and do not read Storage.
+5. If the site is not password protected, serve the requested file.
+6. If the site is password protected, load `siteSecrets/{siteId}` and verify the session cookie for this `siteId`.
+7. If the cookie is valid, serve the requested file.
+8. If there is no valid cookie and the request is `GET`, return the password page with a form action set to the original relative URL including its query string.
+9. If the visitor submits a password with `POST` and it is wrong, return the password page with a conservative error message.
+10. If the visitor submits the correct password, set a session-only `HttpOnly` cookie scoped to the protected site path and redirect to the original relative URL including its query string.
 
 The cookie name is `droplo_site_auth` and its path is `/s/{siteId}`. The cookie does not set `Max-Age` or `Expires`, so browsers treat it as a session cookie. The cookie includes `HttpOnly`, `Secure` in production, and `SameSite=Lax`. The cookie value is an HMAC signature tied to the `siteId` and private password hash, so it cannot be forged without backend-only data.
 
-If `passwordEnabled` is true but the secret document is missing, `serveSite` returns `500` with a generic internal error. This is treated as an inconsistent deployment state.
+If `passwordEnabled` is true but the secret document is missing or the stored `passwordHash` is malformed, `serveSite` returns `500` with a generic internal error. This is treated as an inconsistent deployment state.
 
 ## Firestore Rules
 
@@ -125,16 +129,20 @@ Cloud Functions can continue reading Storage through the Admin SDK, which is not
 ### Visitor Errors
 
 - Missing or expired site: return `404`.
+- Duplicate public metadata for one `siteId`: return a generic internal error and do not read Storage.
 - Protected site without a valid session cookie: show the password page.
+- Protected site with a missing or malformed secret: return a generic internal error.
 - Wrong password: show the password page with an error.
-- Correct password: set the session cookie and redirect to the originally requested path.
+- Correct password: set the session cookie and redirect to the originally requested relative URL, including the query string.
 - Missing, cleared, or invalid cookie: show the password page again.
 
 ## Security Notes
 
 This feature provides basic protection for temporary shared previews. It is not a full authentication or authorization system.
 
-The security boundary is the Cloud Function:
+This implementation remains on Droplo's current shared-origin Firebase Hosting path architecture. It does not isolate protected content from malicious JavaScript running in another uploaded same-origin site; strong hostile-JS isolation would require a per-site-origin or otherwise origin-isolated architecture.
+
+Within that limitation, the Cloud Function gate provides these controls:
 
 - Uploaded files are no longer publicly readable through client Storage APIs.
 - `serveSite` checks site metadata before serving any file.

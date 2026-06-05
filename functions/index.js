@@ -10,6 +10,7 @@ import {
   getRequestPassword,
   getSessionToken,
   hashPassword,
+  isCanonicalPasswordHash,
   renderPasswordPage,
   verifyPassword,
   verifySessionToken,
@@ -19,6 +20,9 @@ initializeApp();
 
 const STORAGE_QUOTA = 5 * 1024 * 1024 * 1024; // 5GB
 const SITE_TTL_DAYS = 7;
+const ORPHAN_SECRET_CLEANUP_LIMIT = 100;
+const SITE_ID_PATTERN = /^[a-z0-9-]+$/i;
+const REQUEST_TARGET_BASE = 'https://droplo.invalid';
 
 const db = getFirestore();
 
@@ -49,16 +53,46 @@ function getMimeType(filePath) {
   return (ext ? MIME_TYPES[ext] : undefined) ?? 'application/octet-stream';
 }
 
+function isValidSiteId(siteId) {
+  return typeof siteId === 'string' && SITE_ID_PATTERN.test(siteId);
+}
+
+function normalizeRelativeRequestTarget(candidate) {
+  if (typeof candidate !== 'string') return null;
+
+  try {
+    const target = new URL(candidate, REQUEST_TARGET_BASE);
+    if (!candidate.startsWith('/') || target.origin !== REQUEST_TARGET_BASE) {
+      return null;
+    }
+
+    return `${target.pathname}${target.search}`;
+  } catch {
+    return null;
+  }
+}
+
+function getRelativeRequestTarget(req) {
+  const candidate =
+    typeof req.originalUrl === 'string' ? req.originalUrl : req.url;
+  const target = normalizeRelativeRequestTarget(candidate);
+  if (target !== null) return target;
+
+  return normalizeRelativeRequestTarget(req.path) ?? '/';
+}
+
 async function findSiteBySiteId(siteId) {
   const snapshot = await db.collection('sites')
     .where('siteId', '==', siteId)
-    .limit(1)
+    .limit(2)
     .get();
 
-  if (snapshot.empty) return null;
+  if (snapshot.empty) return { status: 'missing' };
+  if (snapshot.size > 1) return { status: 'duplicate' };
 
   const doc = snapshot.docs[0];
   return {
+    status: 'found',
     docId: doc.id,
     data: doc.data(),
   };
@@ -67,16 +101,15 @@ async function findSiteBySiteId(siteId) {
 async function cleanupOrphanSecrets(cutoff) {
   const secrets = await db.collection('siteSecrets')
     .where('createdAt', '<', cutoff)
+    .limit(ORPHAN_SECRET_CLEANUP_LIMIT)
     .get();
 
-  await Promise.all(
-    secrets.docs.map(async (secretDoc) => {
-      const site = await findSiteBySiteId(secretDoc.id);
-      if (!site) {
-        await secretDoc.ref.delete();
-      }
-    })
-  );
+  for (const secretDoc of secrets.docs) {
+    const site = await findSiteBySiteId(secretDoc.id);
+    if (site.status === 'missing') {
+      await secretDoc.ref.delete();
+    }
+  }
 }
 
 function isSecureRequest(req) {
@@ -92,9 +125,12 @@ function sendPasswordPage(res, status, pageHtml) {
 }
 
 async function deleteSite(siteId, docId) {
-  const bucket = getStorage().bucket();
-  await bucket.deleteFiles({ prefix: `sites/${siteId}/` });
-  await db.collection('siteSecrets').doc(siteId).delete();
+  if (isValidSiteId(siteId)) {
+    const bucket = getStorage().bucket();
+    await bucket.deleteFiles({ prefix: `sites/${siteId}/` });
+    await db.collection('siteSecrets').doc(siteId).delete();
+  }
+
   if (docId) {
     await db.collection('sites').doc(docId).delete();
   }
@@ -186,7 +222,7 @@ export const createSiteSecret = onCall(
     }
 
     const { siteId, password } = request.data ?? {};
-    if (typeof siteId !== 'string' || !/^[a-z0-9-]+$/i.test(siteId)) {
+    if (!isValidSiteId(siteId)) {
       throw new HttpsError('invalid-argument', '無效的網站 ID');
     }
 
@@ -223,7 +259,7 @@ export const serveSite = onRequest({ region: 'asia-east1' }, async (req, res) =>
     return;
   }
 
-  if (!/^[a-z0-9-]+$/i.test(siteId)) {
+  if (!isValidSiteId(siteId)) {
     res.status(400).send('Invalid site ID');
     return;
   }
@@ -234,11 +270,17 @@ export const serveSite = onRequest({ region: 'asia-east1' }, async (req, res) =>
   }
 
   const cleanPath = filePath.replace(/\/\/+/g, '/').replace(/^\/+/, '');
+  const requestTarget = getRelativeRequestTarget(req);
 
   try {
     const site = await findSiteBySiteId(siteId);
-    if (!site) {
+    if (site.status === 'missing') {
       res.status(404).send('Not found');
+      return;
+    }
+
+    if (site.status === 'duplicate') {
+      res.status(500).send('Internal error');
       return;
     }
 
@@ -250,7 +292,7 @@ export const serveSite = onRequest({ region: 'asia-east1' }, async (req, res) =>
       }
 
       const { passwordHash } = secretSnapshot.data();
-      if (typeof passwordHash !== 'string') {
+      if (!isCanonicalPasswordHash(passwordHash)) {
         res.status(500).send('Internal error');
         return;
       }
@@ -281,7 +323,7 @@ export const serveSite = onRequest({ region: 'asia-east1' }, async (req, res) =>
                 secure: isSecureRequest(req),
               })
             );
-            res.redirect(303, req.path);
+            res.redirect(303, requestTarget);
             return;
           }
 
@@ -289,7 +331,7 @@ export const serveSite = onRequest({ region: 'asia-east1' }, async (req, res) =>
             res,
             401,
             renderPasswordPage({
-              actionPath: req.path,
+              actionPath: requestTarget,
               error: '密碼錯誤',
             })
           );
@@ -301,7 +343,11 @@ export const serveSite = onRequest({ region: 'asia-east1' }, async (req, res) =>
           return;
         }
 
-        sendPasswordPage(res, 401, renderPasswordPage({ actionPath: req.path }));
+        sendPasswordPage(
+          res,
+          401,
+          renderPasswordPage({ actionPath: requestTarget })
+        );
         return;
       }
     }

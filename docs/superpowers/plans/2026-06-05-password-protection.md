@@ -4,7 +4,9 @@
 
 **Goal:** Add optional upload-time password protection for Droplo sites while keeping the default public upload flow unchanged.
 
-**Architecture:** Password choice lives in the React upload flow, but enforcement lives in Firebase Cloud Functions. Public `sites` metadata only stores `passwordEnabled`; private password hashes live in backend-only `siteSecrets/{siteId}` documents. `/s/**` requests go through `serveSite`, which serves public sites immediately and gates protected sites with a session-only HttpOnly cookie.
+**Architecture:** Password choice lives in the React upload flow, but enforcement lives in Firebase Cloud Functions. Public `sites` metadata only stores `passwordEnabled`; private password hashes live in backend-only `siteSecrets/{siteId}` documents. `/s/**` requests go through `serveSite`, which serves public sites immediately and applies a best-effort gate to protected sites with a session-only HttpOnly cookie.
+
+**Best-effort limitation:** This plan keeps Droplo's current shared-origin Firebase Hosting path architecture. It does not isolate protected content from malicious JavaScript running in another uploaded same-origin site; strong hostile-JS isolation would require per-site origins or a separate origin-isolated architecture.
 
 **Tech Stack:** React 19, TypeScript, Vite 8, Tailwind CSS v4, Firebase Firestore/Storage/Functions/Hosting, Node.js 22 `crypto`, Vitest, Node built-in test runner.
 
@@ -1109,6 +1111,7 @@ import {
   getRequestPassword,
   getSessionToken,
   hashPassword,
+  isCanonicalPasswordHash,
   renderPasswordPage,
   verifyPassword,
   verifySessionToken,
@@ -1117,19 +1120,49 @@ import {
 
 - [ ] **Step 2: Add site metadata and orphan secret helpers**
 
-Add these helpers after `getMimeType`:
+Add `ORPHAN_SECRET_CLEANUP_LIMIT = 100` near the other constants, then add these helpers after `getMimeType`:
 
 ```js
+function isValidSiteId(siteId) {
+  return typeof siteId === 'string' && /^[a-z0-9-]+$/i.test(siteId);
+}
+
+function normalizeRelativeRequestTarget(candidate) {
+  if (typeof candidate !== 'string') return null;
+
+  try {
+    const target = new URL(candidate, 'https://droplo.invalid');
+    if (!candidate.startsWith('/') || target.origin !== 'https://droplo.invalid') {
+      return null;
+    }
+
+    return `${target.pathname}${target.search}`;
+  } catch {
+    return null;
+  }
+}
+
+function getRelativeRequestTarget(req) {
+  const candidate =
+    typeof req.originalUrl === 'string' ? req.originalUrl : req.url;
+  const target = normalizeRelativeRequestTarget(candidate);
+  if (target !== null) return target;
+
+  return normalizeRelativeRequestTarget(req.path) ?? '/';
+}
+
 async function findSiteBySiteId(siteId) {
   const snapshot = await db.collection('sites')
     .where('siteId', '==', siteId)
-    .limit(1)
+    .limit(2)
     .get();
 
-  if (snapshot.empty) return null;
+  if (snapshot.empty) return { status: 'missing' };
+  if (snapshot.size > 1) return { status: 'duplicate' };
 
   const doc = snapshot.docs[0];
   return {
+    status: 'found',
     docId: doc.id,
     data: doc.data(),
   };
@@ -1138,16 +1171,15 @@ async function findSiteBySiteId(siteId) {
 async function cleanupOrphanSecrets(cutoff) {
   const secrets = await db.collection('siteSecrets')
     .where('createdAt', '<', cutoff)
+    .limit(ORPHAN_SECRET_CLEANUP_LIMIT)
     .get();
 
-  await Promise.all(
-    secrets.docs.map(async (secretDoc) => {
-      const site = await findSiteBySiteId(secretDoc.id);
-      if (!site) {
-        await secretDoc.ref.delete();
-      }
-    })
-  );
+  for (const secretDoc of secrets.docs) {
+    const site = await findSiteBySiteId(secretDoc.id);
+    if (site.status === 'missing') {
+      await secretDoc.ref.delete();
+    }
+  }
 }
 
 function isSecureRequest(req) {
@@ -1169,9 +1201,12 @@ Replace `deleteSite` with:
 
 ```js
 async function deleteSite(siteId, docId) {
-  const bucket = getStorage().bucket();
-  await bucket.deleteFiles({ prefix: `sites/${siteId}/` });
-  await db.collection('siteSecrets').doc(siteId).delete();
+  if (isValidSiteId(siteId)) {
+    const bucket = getStorage().bucket();
+    await bucket.deleteFiles({ prefix: `sites/${siteId}/` });
+    await db.collection('siteSecrets').doc(siteId).delete();
+  }
+
   if (docId) {
     await db.collection('sites').doc(docId).delete();
   }
@@ -1197,7 +1232,7 @@ export const createSiteSecret = onCall(
     }
 
     const { siteId, password } = request.data ?? {};
-    if (typeof siteId !== 'string' || !/^[a-z0-9-]+$/i.test(siteId)) {
+    if (!isValidSiteId(siteId)) {
       throw new HttpsError('invalid-argument', '無效的網站 ID');
     }
 
@@ -1227,9 +1262,15 @@ export const createSiteSecret = onCall(
 Inside `serveSite`, after `cleanPath` is computed and before the Storage file is read, add:
 
 ```js
+  const requestTarget = getRelativeRequestTarget(req);
   const site = await findSiteBySiteId(siteId);
-  if (!site) {
+  if (site.status === 'missing') {
     res.status(404).send('Not found');
+    return;
+  }
+
+  if (site.status === 'duplicate') {
+    res.status(500).send('Internal error');
     return;
   }
 
@@ -1241,7 +1282,7 @@ Inside `serveSite`, after `cleanPath` is computed and before the Storage file is
     }
 
     const { passwordHash } = secretSnapshot.data();
-    if (typeof passwordHash !== 'string') {
+    if (!isCanonicalPasswordHash(passwordHash)) {
       res.status(500).send('Internal error');
       return;
     }
@@ -1258,7 +1299,7 @@ Inside `serveSite`, after `cleanPath` is computed and before the Storage file is
             'Set-Cookie',
             buildSessionCookie({ siteId, token, secure: isSecureRequest(req) })
           );
-          res.redirect(303, req.path);
+          res.redirect(303, requestTarget);
           return;
         }
 
@@ -1266,7 +1307,7 @@ Inside `serveSite`, after `cleanPath` is computed and before the Storage file is
           res,
           401,
           renderPasswordPage({
-            actionPath: req.path,
+            actionPath: requestTarget,
             error: '密碼錯誤',
           })
         );
@@ -1278,7 +1319,7 @@ Inside `serveSite`, after `cleanPath` is computed and before the Storage file is
         return;
       }
 
-      sendPasswordPage(res, 401, renderPasswordPage({ actionPath: req.path }));
+      sendPasswordPage(res, 401, renderPasswordPage({ actionPath: requestTarget }));
       return;
     }
   }
@@ -1468,7 +1509,7 @@ Expected:
 - Upload with password protection on accepts a 4-character password and result card shows the protected hint.
 - Opening `/s/{siteId}/` for the protected site in a fresh browser session shows the password page.
 - Submitting the wrong password stays on the password page.
-- Submitting the correct password redirects to `/s/{siteId}/` and sets a session cookie.
+- Submitting the correct password redirects to the originally requested relative URL and sets a session cookie.
 - Refreshing the protected page in the same browser session does not ask again.
 
 - [ ] **Step 4: Stop long-running local processes**
@@ -1491,6 +1532,6 @@ Expected: no output.
 
 ## Plan Self-Review
 
-- Spec coverage: Tasks 1-3 cover upload-time optional password UI, default-off behavior, 4-character minimum, ZIP/folder/single HTML option propagation, and result hint. Tasks 4-5 cover backend hashing, private secrets, session-only cookie, password page, wrong-password handling, correct-password redirect, and protected asset serving. Task 6 covers private `siteSecrets` rules and denied direct Storage reads. Task 7 covers full verification.
+- Spec coverage: Tasks 1-3 cover upload-time optional password UI, default-off behavior, 4-character minimum, ZIP/folder/single HTML option propagation, and result hint. Tasks 4-5 cover backend hashing, private secrets, session-only cookie, password page, wrong-password handling, correct-password redirect, and best-effort protected asset serving. Task 6 covers private `siteSecrets` rules and denied direct Storage reads. Task 7 covers full verification. This shared-origin plan does not provide hostile-JavaScript isolation.
 - Type consistency: `UploadOptions`, `UploadResult.passwordEnabled`, `PasswordOptionsProps`, `passwordEnabled`, `siteSecrets/{siteId}`, `passwordHash`, and `droplo_site_auth` are named consistently across tasks.
 - Scope: The plan does not add post-deploy editing, accounts, dashboards, owner links, password recovery, invite lists, analytics, or persistent remember-me behavior.

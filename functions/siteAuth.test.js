@@ -8,6 +8,7 @@ import {
   getRequestPassword,
   getSessionToken,
   hashPassword,
+  isCanonicalPasswordHash,
   renderPasswordPage,
   verifyPassword,
   verifySessionToken,
@@ -82,6 +83,15 @@ test('verifyPassword requires canonical scrypt params and decoded field lengths'
     ),
     false
   );
+});
+
+test('isCanonicalPasswordHash validates generated hashes without throwing', async () => {
+  const validHash = await hashPassword('abcd');
+
+  assert.equal(isCanonicalPasswordHash(validHash), true);
+  assert.equal(isCanonicalPasswordHash('not-a-hash'), false);
+  assert.equal(isCanonicalPasswordHash(`${validHash}$extra`), false);
+  assert.equal(isCanonicalPasswordHash(null), false);
 });
 
 test('session tokens are tied to one site and password hash', async () => {

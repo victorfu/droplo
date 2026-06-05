@@ -91,6 +91,10 @@ function parsePasswordHash(encodedHash) {
   return { encodedHash, salt, hash };
 }
 
+export function isCanonicalPasswordHash(passwordHash) {
+  return parsePasswordHash(passwordHash) !== null;
+}
+
 export async function hashPassword(password) {
   const salt = randomBytes(16);
   const derivedKey = await scrypt(password, salt, KEY_LENGTH, {
