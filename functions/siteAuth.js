@@ -6,7 +6,7 @@ import {
 } from 'node:crypto';
 import { promisify } from 'node:util';
 
-export const COOKIE_NAME = 'droplo_site_auth';
+export const COOKIE_NAME = '__session';
 export const MIN_PASSWORD_LENGTH = 4;
 
 const scrypt = promisify(scryptCallback);

@@ -118,7 +118,7 @@ test('buildSessionCookie creates a session-only HttpOnly cookie scoped to the si
   const token = createSessionToken('site123', hash);
   const cookie = buildSessionCookie({ siteId: 'site123', token, secure: true });
 
-  assert.match(cookie, /^droplo_site_auth=/);
+  assert.match(cookie, /^__session=/);
   assert.match(cookie, /Path=\/s\/site123/);
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /SameSite=Lax/);
@@ -145,7 +145,7 @@ test('buildSessionCookie rejects invalid site path siteIds before building a coo
 
 test('getSessionToken ignores malformed percent-encoded cookie parts', () => {
   assert.equal(
-    getSessionToken({ headers: { cookie: 'droplo_site_auth=%' } }),
+    getSessionToken({ headers: { cookie: '__session=%' } }),
     ''
   );
 });
@@ -154,7 +154,7 @@ test('getSessionToken keeps the first duplicate cookie value', () => {
   assert.equal(
     getSessionToken({
       headers: {
-        cookie: 'droplo_site_auth=first; droplo_site_auth=second',
+        cookie: '__session=first; __session=second',
       },
     }),
     'first'

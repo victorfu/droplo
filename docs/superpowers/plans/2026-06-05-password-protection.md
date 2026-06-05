@@ -840,7 +840,7 @@ test('buildSessionCookie creates a session-only HttpOnly cookie scoped to the si
   const token = createSessionToken('site123', hash);
   const cookie = buildSessionCookie({ siteId: 'site123', token, secure: true });
 
-  assert.match(cookie, /^droplo_site_auth=/);
+  assert.match(cookie, /^__session=/);
   assert.match(cookie, /Path=\/s\/site123/);
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /SameSite=Lax/);
@@ -892,7 +892,7 @@ import {
 } from 'node:crypto';
 import { promisify } from 'node:util';
 
-export const COOKIE_NAME = 'droplo_site_auth';
+export const COOKIE_NAME = '__session';
 export const MIN_PASSWORD_LENGTH = 4;
 
 const scrypt = promisify(scryptCallback);
@@ -1533,5 +1533,5 @@ Expected: no output.
 ## Plan Self-Review
 
 - Spec coverage: Tasks 1-3 cover upload-time optional password UI, default-off behavior, 4-character minimum, ZIP/folder/single HTML option propagation, and result hint. Tasks 4-5 cover backend hashing, private secrets, session-only cookie, password page, wrong-password handling, correct-password redirect, and best-effort protected asset serving. Task 6 covers private `siteSecrets` rules and denied direct Storage reads. Task 7 covers full verification. This shared-origin plan does not provide hostile-JavaScript isolation.
-- Type consistency: `UploadOptions`, `UploadResult.passwordEnabled`, `PasswordOptionsProps`, `passwordEnabled`, `siteSecrets/{siteId}`, `passwordHash`, and `droplo_site_auth` are named consistently across tasks.
+- Type consistency: `UploadOptions`, `UploadResult.passwordEnabled`, `PasswordOptionsProps`, `passwordEnabled`, `siteSecrets/{siteId}`, `passwordHash`, and `__session` are named consistently across tasks.
 - Scope: The plan does not add post-deploy editing, accounts, dashboards, owner links, password recovery, invite lists, analytics, or persistent remember-me behavior.

@@ -103,7 +103,9 @@ Password hashing happens in Cloud Functions, not in the browser. This keeps hash
 9. If the visitor submits a password with `POST` and it is wrong, return the password page with a conservative error message.
 10. If the visitor submits the correct password, set a session-only `HttpOnly` cookie scoped to the protected site path and redirect to the original relative URL including its query string.
 
-The cookie name is `droplo_site_auth` and its path is `/s/{siteId}`. The cookie does not set `Max-Age` or `Expires`, so browsers treat it as a session cookie. The cookie includes `HttpOnly`, `Secure` in production, and `SameSite=Lax`. The cookie value is an HMAC signature tied to the `siteId` and private password hash, so it cannot be forged without backend-only data.
+The cookie name is `__session`, because Firebase Hosting only forwards this reserved cookie name to backend functions behind hosting rewrites. Its path is `/s/{siteId}`. The cookie does not set `Max-Age` or `Expires`, so browsers treat it as a session cookie. The cookie includes `HttpOnly`, `Secure` in production, and `SameSite=Lax`. The cookie value is an HMAC signature tied to the `siteId` and private password hash, so it cannot be forged without backend-only data.
+
+Public and unprotected file responses may use public caching. Protected file responses use `Cache-Control: no-store` after successful cookie or password authentication.
 
 If `passwordEnabled` is true but the secret document is missing or the stored `passwordHash` is malformed, `serveSite` returns `500` with a generic internal error. This is treated as an inconsistent deployment state.
 
